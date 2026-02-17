@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>90-Day Income Map · Runway System</title>
+  <link rel="stylesheet" href="assets/style.css"/>
+</head>
+<body data-page="income">
+  <div class="topbar">
+    <div class="container">
+      <div class="row" style="justify-content:space-between">
+        <div class="brand"><span style="font-size:20px">📈</span><span>90-Day Income Map</span></div>
+        <div class="row" style="gap:8px">
+          <button class="btn" data-export>Export</button>
+          <label class="btn">Import <input type="file" accept="application/json" data-import style="display:none"></label>
+        </div>
+      </div>
+      <div class="nav">
+        <a data-nav href="index.html">Home</a>
+        <a data-nav href="quick-capture.html">⚡ Quick Capture</a>
+        <a data-nav href="thread-registry.html">Thread Registry</a>
+        <a data-nav href="strategic-life-map.html">Strategic Life Map</a>
+        <a data-nav href="income-map.html">90-Day Income Map</a>
+        <a data-nav href="how-it-works.html">How This Works</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="grid">
+      <div class="card">
+        <h2>Start date</h2>
+        <p class="kicker">Set your medical leave (or plan) start date. The system computes your current week.</p>
+        <label>Start date</label>
+        <input id="startDate" type="date"/>
+        <hr/>
+        <div class="item">
+          <strong>Where you are now</strong>
+          <div class="meta">
+            <span class="pill good" id="weekNow"></span>
+          </div>
+          <p class="small">Use this to reduce uncertainty. The week is a fact, not a mood.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Escalation checkpoints</h2>
+        <p class="kicker">These are rules — so you don’t renegotiate the same fear every week.</p>
+        <div id="checkpoints" class="list"></div>
+      </div>
+    </div>
+
+    <div class="footer" data-footer></div>
+  </div>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>
