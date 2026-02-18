@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Strategic Life Map · Planner</title>
+  <link rel="stylesheet" href="assets/style.css"/>
+</head>
+<body data-page="lifemap">
+
+  <div class="topbar">
+    <div class="container">
+      <div class="row" style="justify-content:space-between">
+        <div class="brand">
+          <span style="font-size:20px">🧭</span>
+          <span>Strategic Life Map</span>
+          <span class="badge" data-sync-indicator>● Not connected</span>
+        </div>
+        <div class="row" style="gap:8px">
+          <button class="btn" data-open-sync>Sync</button>
+          <button class="btn" data-toggle-dopamine>Color</button>
+          <button class="btn" data-open-admin>Admin</button>
+          <button class="btn" data-export>Export</button>
+          <label class="btn" style="cursor:pointer">
+            Import <input type="file" accept="application/json" data-import style="display:none">
+          </label>
+        </div>
+      </div>
+
+      <div class="nav">
+        <a data-nav href="index.html">Home</a>
+        <a data-nav href="quick-capture.html">⚡ Quick Capture</a>
+        <a data-nav href="thread-registry.html">Thread Registry</a>
+        <a data-nav href="strategic-life-map.html">Strategic Life Map</a>
+        <a data-nav href="income-map.html">90-Day Income Map</a>
+        <a data-nav href="how-it-works.html">How This Works</a>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="container">
+    <div class="card">
+      <h2>Domains (1–5 years)</h2>
+      <p class="kicker">This page is for scheduled thinking. If you’re avoiding work, go back to the Registry.</p>
+      <div id="domains" class="list"></div>
+    </div>
+
+    <div class="footer" data-footer></div>
+  </div>
+
+
+  <!-- Sync Modal -->
+  <div class="modal-backdrop" id="syncModalBackdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Sync Settings">
+      <div class="modal-header">
+        <div class="modal-title">Sync (GitHub Gist)</div>
+        <button class="btn" data-close-sync>Close</button>
+      </div>
+      <p class="kicker">Auto-pull on load is ON. Push is manual. Token stays on this device only.</p>
+
+      <label>Gist ID</label>
+      <input id="syncGistId" placeholder="paste the Gist ID from the URL"/>
+
+      <label>GitHub Token (gist read/write)</label>
+      <input id="syncToken" type="password" placeholder="paste token here"/>
+
+      <label style="display:flex;align-items:center;gap:10px;margin-top:10px">
+        <input id="syncAutoPull" type="checkbox" style="width:auto"> Enable auto-pull on page load
+      </label>
+
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="syncSave">Save</button>
+        <button class="btn good" id="syncPull">Pull</button>
+        <button class="btn warn" id="syncForcePull">Force Pull</button>
+        <button class="btn primary" id="syncPush">Push</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn bad" id="syncClear">Clear sync settings (this device)</button>
+      </div>
+      <p class="small" id="syncStatus"></p>
+      <p class="small">Cloud file name: <span class="mono">planner-data.json</span></p>
+    </div>
+  </div>
+
+
+
+  <!-- Admin Modal -->
+  <div class="modal-backdrop" id="adminModalBackdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Admin">
+      <div class="modal-header">
+        <div class="modal-title">Admin</div>
+        <button class="btn" data-close-admin>Close</button>
+      </div>
+      <p class="kicker">Quick controls. (Sync is separate and uses your device-local token.)</p>
+      <div class="list">
+        <div class="item domain-other">
+          <div class="domain-strip"></div>
+          <strong>Appearance</strong>
+          <div class="meta">
+            <span class="pill">Professional</span>
+            <span class="pill">Toggle extra color</span>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn primary" data-toggle-dopamine>Toggle “Color +”</button>
+          </div>
+        </div>
+
+        <div class="item domain-work-income">
+          <div class="domain-strip"></div>
+          <strong>Data safety</strong>
+          <p class="small">Before big changes: Export a backup, then Push to Gist.</p>
+          <div class="row" style="margin-top:10px">
+            <button class="btn" data-export>Export backup</button>
+            <button class="btn" data-open-sync>Open Sync</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <script src="assets/app.js"></script></script>
+</body>
+</html>
