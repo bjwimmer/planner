@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Runway System</title>
+  <title>Planner</title>
   <link rel="stylesheet" href="assets/style.css"/>
 </head>
 <body>
@@ -12,8 +12,8 @@
     <div class="container">
       <div class="row" style="justify-content:space-between">
         <div class="brand">
-          <span style="font-size:20px">🛫</span>
-          <span>Runway System</span>
+          <span style="font-size:20px">🧭</span>
+          <span>Planner</span>
           <span class="badge" data-sync-indicator>● Not connected</span>
         </div>
         <div class="row" style="gap:8px">
@@ -48,12 +48,13 @@
         </div>
         <hr/>
         <p class="kicker">
-          Data lives locally <em>and</em> (optionally) in your GitHub Gist via Sync. Auto-pull on load is enabled if you connect.
+          Your data lives locally in your browser, and optionally in a GitHub Gist (<span class="mono">planner-data.json</span>).
+          With Sync connected, pages auto-pull on load; you push manually when you want to publish changes.
         </p>
       </div>
 
       <div class="card">
-        <h2>What this system protects</h2>
+        <h2>What this protects</h2>
         <p><strong>Mode switching is expensive.</strong> So we separate:</p>
         <div class="list">
           <div class="item">
@@ -89,7 +90,7 @@
       <p class="kicker">Auto-pull on load is ON. Push is manual. Token stays on this device only.</p>
 
       <label>Gist ID</label>
-      <input id="syncGistId" placeholder="e.g. cal2d4ba26cafb49a329ef0318214f64"/>
+      <input id="syncGistId" placeholder="paste the Gist ID from the URL"/>
 
       <label>GitHub Token (gist read/write)</label>
       <input id="syncToken" type="password" placeholder="paste token here"/>
@@ -108,6 +109,7 @@
         <button class="btn bad" id="syncClear">Clear sync settings (this device)</button>
       </div>
       <p class="small" id="syncStatus"></p>
+      <p class="small">Cloud file name: <span class="mono">planner-data.json</span></p>
     </div>
   </div>
 

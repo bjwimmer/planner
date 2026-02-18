@@ -34,7 +34,7 @@ code{font-family:var(--mono); color:#3730a3}
 .container{max-width:1080px; margin:0 auto; padding:22px}
 .topbar{
   position:sticky; top:0; z-index:20;
-  background: rgba(247,248,251,.82);
+  background: rgba(247,248,251,.86);
   backdrop-filter: blur(10px);
   border-bottom:1px solid rgba(215,222,233,.9);
 }
@@ -44,7 +44,7 @@ code{font-family:var(--mono); color:#3730a3}
 }
 .badge{
   font-size:12px; padding:4px 10px; border:1px solid var(--line);
-  border-radius:999px; color:var(--muted); background:rgba(255,255,255,.75);
+  border-radius:999px; color:var(--muted); background:rgba(255,255,255,.78);
 }
 .nav{
   display:flex; flex-wrap:wrap; gap:10px;
@@ -54,7 +54,7 @@ code{font-family:var(--mono); color:#3730a3}
   font-size:13px;
   padding:8px 10px;
   border:1px solid var(--line);
-  background:rgba(255,255,255,.75);
+  background:rgba(255,255,255,.78);
   border-radius:999px;
 }
 .nav a.active{
@@ -93,7 +93,7 @@ input, textarea, select{
   padding:10px 12px;
   border-radius: 12px;
   border:1px solid rgba(215,222,233,.95);
-  background: rgba(255,255,255,.9);
+  background: rgba(255,255,255,.92);
   color:var(--text);
   outline:none;
 }
@@ -105,7 +105,7 @@ input::placeholder, textarea::placeholder{color:#94a3b8}
   padding:10px 12px;
   border-radius: 12px;
   border:1px solid rgba(215,222,233,.98);
-  background: rgba(255,255,255,.85);
+  background: rgba(255,255,255,.88);
   color:var(--text);
   cursor:pointer;
   gap:8px;
@@ -130,11 +130,11 @@ input::placeholder, textarea::placeholder{color:#94a3b8}
   border:1px solid rgba(215,222,233,.95);
   border-radius: 14px;
   padding:12px;
-  background: rgba(255,255,255,.75);
+  background: rgba(255,255,255,.78);
 }
 .item strong{display:block; margin-bottom:4px}
 .item .meta{display:flex; gap:10px; flex-wrap:wrap; color:var(--muted); font-size:12px}
-.pill{padding:3px 8px; border-radius:999px; border:1px solid var(--line); background:rgba(255,255,255,.85)}
+.pill{padding:3px 8px; border-radius:999px; border:1px solid var(--line); background:rgba(255,255,255,.9)}
 .pill.good{border-color: rgba(5,150,105,.45)}
 .pill.warn{border-color: rgba(217,119,6,.45)}
 .pill.bad{border-color: rgba(225,29,72,.45)}

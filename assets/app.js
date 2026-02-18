@@ -1,15 +1,16 @@
-// Runway / Thread System - localStorage-first, plus optional GitHub Gist sync.
+// Planner (Thread System) - localStorage-first, plus optional GitHub Gist sync.
 
-const STORE_KEY = "runwaySystem.v1";
-const SYNC_KEY  = "runwaySystem.sync.v1"; // {gistId, token, autoPull:true}
-const AUTO_PULL_SESSION_KEY = "runwaySystem.autoPulled.v1";
+const STORE_KEY = "planner.data.v1";
+const SYNC_KEY  = "planner.sync.v1"; // {gistId, token, autoPull:true}
+const AUTO_PULL_SESSION_KEY = "planner.autoPulled.v1";
+const GIST_FILENAME = "planner-data.json";
 
 function nowIso(){ return new Date().toISOString(); }
 function uid(){ return Math.random().toString(16).slice(2) + "-" + Date.now().toString(16); }
 
 function defaultState(){
   return {
-    meta: { createdAt: nowIso(), updatedAt: nowIso(), title: "Runway System" },
+    meta: { createdAt: nowIso(), updatedAt: nowIso(), title: "Planner" },
     inbox: [], // {id, text, createdAt, status:'open'|'archived'}
     threads: [], // {id,title,status,domain,nextAction,notes,createdAt,updatedAt}
     weekly: { slot1: null, slot2: null, weekOf: null }, // weekOf ISO date (Monday)
@@ -29,13 +30,15 @@ function loadState(){
     const raw = localStorage.getItem(STORE_KEY);
     if(!raw) return defaultState();
     const st = JSON.parse(raw);
+
     // minimal migration safety
-    if(!st.meta) st.meta = { createdAt: nowIso(), updatedAt: nowIso(), title:"Runway System" };
+    if(!st.meta) st.meta = { createdAt: nowIso(), updatedAt: nowIso(), title:"Planner" };
     if(!st.inbox) st.inbox = [];
     if(!st.threads) st.threads = [];
     if(!st.weekly) st.weekly = { slot1:null, slot2:null, weekOf:null };
     if(!st.lifeMap) st.lifeMap = defaultState().lifeMap;
     if(!st.incomeMap) st.incomeMap = { startDate:null };
+
     return st;
   }catch(e){
     console.warn("State load failed, resetting", e);
@@ -98,7 +101,7 @@ function exportJson(){
   const blob = new Blob([JSON.stringify(st,null,2)], {type:"application/json"});
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "runway-system-backup.json";
+  a.download = "planner-backup.json";
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -151,20 +154,22 @@ async function githubFetchGist(gistId, token){
   return await res.json();
 }
 
-function pickGistFile(gistJson){
+function findPlannerFile(gistJson){
   const files = Object.values(gistJson.files || {});
   if(!files.length) return null;
-  return files.find(f => (f.filename || "").toLowerCase().endsWith(".json")) || files[0];
+  // Prefer exact filename match to avoid collisions with older gists/files
+  return files.find(f => (f.filename || "") === GIST_FILENAME) || null;
 }
 
 async function githubPull({force=false} = {}){
   const cfg = loadSync();
   if(!cfg?.gistId || !cfg?.token) throw new Error("Not connected. Add Gist ID and token in Sync.");
-  const gist = await githubFetchGist(cfg.gistId, cfg.token);
-  const file = pickGistFile(gist);
-  if(!file?.content) throw new Error("No file content found in gist.");
-  const remoteState = JSON.parse(file.content);
 
+  const gist = await githubFetchGist(cfg.gistId, cfg.token);
+  const file = findPlannerFile(gist);
+  if(!file?.content) throw new Error(`${GIST_FILENAME} not found in this Gist.`);
+
+  const remoteState = JSON.parse(file.content);
   const localState = loadState();
   const remoteUpdated = parseIso(remoteState?.meta?.updatedAt);
   const localUpdated  = parseIso(localState?.meta?.updatedAt);
@@ -182,7 +187,6 @@ async function githubPush(){
   if(!cfg?.gistId || !cfg?.token) throw new Error("Not connected. Add Gist ID and token in Sync.");
 
   const st = loadState();
-  const filename = "runway-system.json";
 
   const res = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
     method: "PATCH",
@@ -192,7 +196,7 @@ async function githubPush(){
     },
     body: JSON.stringify({
       files: {
-        [filename]: { content: JSON.stringify(st, null, 2) }
+        [GIST_FILENAME]: { content: JSON.stringify(st, null, 2) }
       }
     })
   });
@@ -302,13 +306,10 @@ async function autoPullIfEnabled(){
 
   try{
     const r = await githubPull({force:false});
-    // If we applied remote state, refresh UI to reflect it
     if(r.applied){
-      // small delay so browser paints first
       setTimeout(()=>location.reload(), 200);
     }
   }catch(e){
-    // silent on auto-pull; user can open Sync panel to see errors
     console.warn("Auto-pull failed:", e);
   }
 }

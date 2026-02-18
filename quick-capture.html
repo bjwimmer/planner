@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Quick Capture · Runway System</title>
+  <title>Quick Capture · Planner</title>
   <link rel="stylesheet" href="assets/style.css"/>
 </head>
 <body data-page="quick">
@@ -74,7 +74,7 @@
       <p class="kicker">Auto-pull on load is ON. Push is manual. Token stays on this device only.</p>
 
       <label>Gist ID</label>
-      <input id="syncGistId" placeholder="e.g. cal2d4ba26cafb49a329ef0318214f64"/>
+      <input id="syncGistId" placeholder="paste the Gist ID from the URL"/>
 
       <label>GitHub Token (gist read/write)</label>
       <input id="syncToken" type="password" placeholder="paste token here"/>
@@ -93,6 +93,7 @@
         <button class="btn bad" id="syncClear">Clear sync settings (this device)</button>
       </div>
       <p class="small" id="syncStatus"></p>
+      <p class="small">Cloud file name: <span class="mono">planner-data.json</span></p>
     </div>
   </div>
 
