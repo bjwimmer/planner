@@ -1,4 +1,4 @@
-const BUILD_VERSION = 'v17';
+const BUILD_VERSION = 'v18';
 console.log('Planner build', BUILD_VERSION);
 
 // Planner (Thread System) - localStorage-first, plus optional GitHub Gist sync.
