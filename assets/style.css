@@ -229,3 +229,23 @@ body.dopamine .card::before{
     rgba(217,119,6,.92)
   );
 }
+
+/* Color+ mode (slightly more saturated, still professional) */
+html[data-color="plus"]{
+  --shadow: 0 12px 30px rgba(15,23,42,.12);
+}
+html[data-color="plus"] body{
+  background:
+    radial-gradient(1100px 600px at 10% 6%, rgba(37,99,235,.18), transparent 55%),
+    radial-gradient(900px 520px at 88% 18%, rgba(124,58,237,.16), transparent 60%),
+    radial-gradient(900px 520px at 80% 82%, rgba(5,150,105,.13), transparent 60%),
+    var(--bg);
+}
+html[data-color="plus"] .card::before{
+  background: linear-gradient(90deg,
+    rgba(37,99,235,.98),
+    rgba(124,58,237,.94),
+    rgba(5,150,105,.90),
+    rgba(217,119,6,.94)
+  );
+}

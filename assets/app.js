@@ -7,6 +7,66 @@ const UI_KEY = "planner.ui.v1"; // {dopamine:boolean}
 
 const GIST_FILENAME = "planner-data.json";
 
+/* V3 DELEGATION */
+window.__PLANNER_LOADED__ = true;
+
+function qs(sel, root=document){ return root.querySelector(sel); }
+
+function safe(fn){
+  try{ fn(); }catch(e){ console.error("Planner error:", e); }
+}
+
+function wireTopButtons() {
+  document.addEventListener("click", (e)=>{
+    const btn = e.target.closest("button, a, label");
+    if(!btn) return;
+    const id = btn.id || "";
+    const t = (btn.textContent||"").trim().toLowerCase();
+
+    if(id==="btnSync" || btn.hasAttribute("data-open-sync") || t==="sync") {
+      e.preventDefault(); safe(()=>openModal()); 
+    }
+    if(id==="btnColor" || t==="color" || t==="color+") {
+      e.preventDefault(); safe(()=>toggleColorMode());
+    }
+    if(id==="btnAdmin" || t==="admin") {
+      e.preventDefault(); safe(()=>openAdmin());
+    }
+    if(id==="btnExport" || btn.hasAttribute("data-export") || t==="export") {
+      e.preventDefault(); safe(()=>exportJson());
+    }
+  });
+}
+
+function toggleColorMode(){
+  const key="planner.color.mode.v1";
+  const cur = localStorage.getItem(key) || "normal";
+  const next = (cur==="normal") ? "plus" : "normal";
+  localStorage.setItem(key,next);
+  document.documentElement.setAttribute("data-color", next);
+  const b = document.getElementById("btnColor");
+  if(b) b.textContent = (next==="plus") ? "Color+" : "Color";
+}
+
+function applyColorMode(){
+  const key="planner.color.mode.v1";
+  const cur = localStorage.getItem(key) || "normal";
+  document.documentElement.setAttribute("data-color", cur);
+  const b = document.getElementById("btnColor");
+  if(b) b.textContent = (cur==="plus") ? "Color+" : "Color";
+}
+
+function openAdmin(){
+  const back = document.getElementById("adminModalBackdrop");
+  if(back) back.style.display="flex";
+  else openModal();
+}
+function closeAdmin(){
+  const back = document.getElementById("adminModalBackdrop");
+  if(back) back.style.display="none";
+}
+
+
 function nowIso(){ return new Date().toISOString(); }
 function uid(){ return Math.random().toString(16).slice(2) + "-" + Date.now().toString(16); }
 
@@ -371,6 +431,8 @@ async function autoPullIfEnabled(){
 // --- Page Initializers ---
 function initCommon(){
   const st = loadState();
+  applyColorMode();
+  wireTopButtons();
   setActiveNav();
   renderFooter(st);
 
