@@ -95,6 +95,19 @@ function weekNumberFromStart(startYmd){
   return weeks < 1 ? 1 : weeks;
 }
 
+
+// --- Domain auto-color mapping ---
+function domainClass(domainRaw){
+  const d = (domainRaw || "").trim().toLowerCase();
+  if(!d) return "domain-other";
+  if(d.includes("health")) return "domain-health";
+  if(d.includes("home")) return "domain-home";
+  if(d.includes("work") || d.includes("income") || d.includes("money") || d.includes("job") || d.includes("career")) return "domain-work-income";
+  if(d.includes("relationship") || d.includes("family") || d.includes("social")) return "domain-relationships";
+  if(d.includes("creative") || d.includes("meaning") || d.includes("writing") || d.includes("art")) return "domain-creative-meaning";
+  return "domain-other";
+}
+
 // --- Export / Import ---
 function exportJson(){
   const st = loadState();
@@ -358,7 +371,8 @@ function initQuickCapture(){
   function render(){
     const openItems = st.inbox.filter(i=>i.status!=="archived").sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
     list.innerHTML = openItems.length ? openItems.map(i=>`
-      <div class="item">
+      <div class="item ${dClass}">
+        <div class="domain-strip"></div>
         <strong>${escapeHtml(i.text)}</strong>
         <div class="meta">
           <span class="pill">Inbox</span>
@@ -366,7 +380,8 @@ function initQuickCapture(){
           <button class="btn" data-arch="${i.id}">Archive</button>
         </div>
       </div>
-    `).join("") : `<p class="small">Inbox is empty. Nice.</p>`;
+    `;
+    }).join("") : `<p class="small">Inbox is empty. Nice.</p>`;
 
     list.querySelectorAll("[data-arch]").forEach(btn=>{
       btn.addEventListener("click", ()=>{
@@ -439,6 +454,7 @@ function initThreadRegistry(){
     const openItems = st.inbox.filter(i=>i.status!=="archived").sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
     inboxEl.innerHTML = openItems.length ? openItems.map(i=>`
       <div class="item">
+        <div class="domain-strip"></div>
         <strong>${escapeHtml(i.text)}</strong>
         <div class="meta">
           <span class="pill">Inbox</span>
@@ -498,7 +514,8 @@ function initThreadRegistry(){
       const pill = inSlot ? `<span class="pill good">Active this week</span>` : `<span class="pill">Backlog</span>`;
       return `
         <div class="item">
-          <strong>${escapeHtml(t.title)}</strong>
+        <div class="domain-strip"></div>
+        <strong>${escapeHtml(t.title)}</strong>
           <div class="meta">
             ${pill}
             ${t.domain ? `<span class="pill">${escapeHtml(t.domain)}</span>` : ``}
@@ -621,6 +638,7 @@ function initLifeMap(){
   function render(){
     domainsEl.innerHTML = st.lifeMap.domains.map(d=>`
       <div class="item">
+        <div class="domain-strip"></div>
         <strong>${escapeHtml(d.name)}</strong>
         <label>Notes / current focus</label>
         <textarea data-domain="${d.id}">${escapeHtml(d.notes||"")}</textarea>
@@ -666,6 +684,7 @@ function initIncomeMap(){
     checkpointsEl.innerHTML = cp.map(x=>{
       const tone = w && w >= x.w ? "good" : "warn";
       return `<div class="item">
+        <div class="domain-strip"></div>
         <strong>${escapeHtml(x.label)}</strong>
         <div class="meta">
           <span class="pill ${tone}">${w && w>=x.w ? "Reached" : "Upcoming"}</span>
