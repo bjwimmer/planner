@@ -1,4 +1,4 @@
-const BUILD_VERSION = 'v16';
+const BUILD_VERSION = 'v17';
 console.log('Planner build', BUILD_VERSION);
 
 // Planner (Thread System) - localStorage-first, plus optional GitHub Gist sync.
@@ -266,6 +266,10 @@ function renderFooter(st){
 
 function escapeHtml(s){
   return (s ?? "").replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m]));
+}
+
+function escapeAttr(s){
+  return escapeHtml(s);
 }
 
 function mondayOf(date){
