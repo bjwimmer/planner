@@ -3,69 +3,7 @@
 const STORE_KEY = "planner.data.v1";
 const SYNC_KEY  = "planner.sync.v1"; // {gistId, token, autoPull:true}
 const AUTO_PULL_SESSION_KEY = "planner.autoPulled.v1";
-const UI_KEY = "planner.ui.v1"; // {dopamine:boolean}
-
 const GIST_FILENAME = "planner-data.json";
-
-/* V3 DELEGATION */
-window.__PLANNER_LOADED__ = true;
-
-function qs(sel, root=document){ return root.querySelector(sel); }
-
-function safe(fn){
-  try{ fn(); }catch(e){ console.error("Planner error:", e); }
-}
-
-function wireTopButtons() {
-  document.addEventListener("click", (e)=>{
-    const btn = e.target.closest("button, a, label");
-    if(!btn) return;
-    const id = btn.id || "";
-    const t = (btn.textContent||"").trim().toLowerCase();
-
-    if(id==="btnSync" || btn.hasAttribute("data-open-sync") || t==="sync") {
-      e.preventDefault(); safe(()=>openModal()); 
-    }
-    if(id==="btnColor" || t==="color" || t==="color+") {
-      e.preventDefault(); safe(()=>toggleColorMode());
-    }
-    if(id==="btnAdmin" || t==="admin") {
-      e.preventDefault(); safe(()=>openAdmin());
-    }
-    if(id==="btnExport" || btn.hasAttribute("data-export") || t==="export") {
-      e.preventDefault(); safe(()=>exportJson());
-    }
-  });
-}
-
-function toggleColorMode(){
-  const key="planner.color.mode.v1";
-  const cur = localStorage.getItem(key) || "normal";
-  const next = (cur==="normal") ? "plus" : "normal";
-  localStorage.setItem(key,next);
-  document.documentElement.setAttribute("data-color", next);
-  const b = document.getElementById("btnColor");
-  if(b) b.textContent = (next==="plus") ? "Color+" : "Color";
-}
-
-function applyColorMode(){
-  const key="planner.color.mode.v1";
-  const cur = localStorage.getItem(key) || "normal";
-  document.documentElement.setAttribute("data-color", cur);
-  const b = document.getElementById("btnColor");
-  if(b) b.textContent = (cur==="plus") ? "Color+" : "Color";
-}
-
-function openAdmin(){
-  const back = document.getElementById("adminModalBackdrop");
-  if(back) back.style.display="flex";
-  else openModal();
-}
-function closeAdmin(){
-  const back = document.getElementById("adminModalBackdrop");
-  if(back) back.style.display="none";
-}
-
 
 function nowIso(){ return new Date().toISOString(); }
 function uid(){ return Math.random().toString(16).slice(2) + "-" + Date.now().toString(16); }
@@ -113,18 +51,6 @@ function saveState(st){
   localStorage.setItem(STORE_KEY, JSON.stringify(st));
 }
 
-
-function loadUI(){
-  try{ return JSON.parse(localStorage.getItem(UI_KEY) || "null") || {dopamine:false}; }
-  catch{ return {dopamine:false}; }
-}
-function saveUI(ui){ localStorage.setItem(UI_KEY, JSON.stringify(ui)); }
-function applyUI(){
-  const ui = loadUI();
-  if(ui.dopamine) document.body.classList.add("dopamine");
-  else document.body.classList.remove("dopamine");
-}
-
 function setActiveNav(){
   const path = (location.pathname.split("/").pop() || "index.html").toLowerCase();
   document.querySelectorAll("[data-nav]").forEach(a=>{
@@ -167,31 +93,6 @@ function weekNumberFromStart(startYmd){
   const ms = today - start;
   const weeks = Math.floor(ms / (1000*60*60*24*7)) + 1;
   return weeks < 1 ? 1 : weeks;
-}
-
-
-// --- Domain auto-color mapping ---
-
-function domainIcon(domainRaw){
-  const d = (domainRaw || "").trim().toLowerCase();
-  if(!d) return "🧩";
-  if(d.includes("health")) return "🩺";
-  if(d.includes("home")) return "🏠";
-  if(d.includes("work") || d.includes("income") || d.includes("money") || d.includes("job") || d.includes("career")) return "💼";
-  if(d.includes("relationship") || d.includes("family") || d.includes("social")) return "🤝";
-  if(d.includes("creative") || d.includes("meaning") || d.includes("writing") || d.includes("art")) return "✨";
-  return "🧩";
-}
-
-function domainClass(domainRaw){
-  const d = (domainRaw || "").trim().toLowerCase();
-  if(!d) return "domain-other";
-  if(d.includes("health")) return "domain-health";
-  if(d.includes("home")) return "domain-home";
-  if(d.includes("work") || d.includes("income") || d.includes("money") || d.includes("job") || d.includes("career")) return "domain-work-income";
-  if(d.includes("relationship") || d.includes("family") || d.includes("social")) return "domain-relationships";
-  if(d.includes("creative") || d.includes("meaning") || d.includes("writing") || d.includes("art")) return "domain-creative-meaning";
-  return "domain-other";
 }
 
 // --- Export / Import ---
@@ -325,21 +226,6 @@ function closeModal(){
   const back = document.getElementById("syncModalBackdrop");
   if(back) back.style.display = "none";
 }
-
-function openAdmin(){
-  const back = document.getElementById("adminModalBackdrop");
-  if(back) back.style.display = "flex";
-}
-function closeAdmin(){
-  const back = document.getElementById("adminModalBackdrop");
-  if(back) back.style.display = "none";
-}
-function wireAdmin(){
-  const openBtn = document.querySelector("[data-open-admin]");
-  if(openBtn) openBtn.addEventListener("click", openAdmin);
-  document.querySelectorAll("[data-close-admin]").forEach(b=>b.addEventListener("click", closeAdmin));
-}
-
 function wireModal(){
   const openBtn = document.querySelector("[data-open-sync]");
   if(openBtn) openBtn.addEventListener("click", openModal);
@@ -431,8 +317,6 @@ async function autoPullIfEnabled(){
 // --- Page Initializers ---
 function initCommon(){
   const st = loadState();
-  applyColorMode();
-  wireTopButtons();
   setActiveNav();
   renderFooter(st);
 
@@ -457,21 +341,6 @@ function initCommon(){
 
   setSyncIndicator();
   wireModal();
-  wireAdmin();
-
-  const dopBtn = document.querySelector('[data-toggle-dopamine]');
-  if(dopBtn){
-    dopBtn.addEventListener('click', ()=>{
-      const ui = loadUI();
-      ui.dopamine = !ui.dopamine;
-      saveUI(ui);
-      applyUI();
-      dopBtn.textContent = ui.dopamine ? 'Color +' : 'Color';
-    });
-    const ui = loadUI();
-    dopBtn.textContent = ui.dopamine ? 'Color +' : 'Color';
-  }
-
   autoPullIfEnabled();
 
   return st;
@@ -489,8 +358,7 @@ function initQuickCapture(){
   function render(){
     const openItems = st.inbox.filter(i=>i.status!=="archived").sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
     list.innerHTML = openItems.length ? openItems.map(i=>`
-      <div class="item ${dClass}">
-        <div class="domain-strip"></div>
+      <div class="item">
         <strong>${escapeHtml(i.text)}</strong>
         <div class="meta">
           <span class="pill">Inbox</span>
@@ -498,8 +366,7 @@ function initQuickCapture(){
           <button class="btn" data-arch="${i.id}">Archive</button>
         </div>
       </div>
-    `;
-    }).join("") : `<p class="small">Inbox is empty. Nice.</p>`;
+    `).join("") : `<p class="small">Inbox is empty. Nice.</p>`;
 
     list.querySelectorAll("[data-arch]").forEach(btn=>{
       btn.addEventListener("click", ()=>{
@@ -528,6 +395,18 @@ function initQuickCapture(){
 }
 
 // --- Thread Registry ---
+// --- Domain auto-color mapping (UI only) ---
+function domainClass(domainRaw){
+  const d = (domainRaw || "").trim().toLowerCase();
+  if(!d) return "domain-other";
+  if(d.includes("health")) return "domain-health";
+  if(d.includes("home") || d.includes("house")) return "domain-home";
+  if(d.includes("work") || d.includes("income") || d.includes("money") || d.includes("job") || d.includes("career")) return "domain-work-income";
+  if(d.includes("relationship") || d.includes("family") || d.includes("social")) return "domain-relationships";
+  if(d.includes("creative") || d.includes("meaning") || d.includes("writing") || d.includes("art")) return "domain-creative-meaning";
+  return "domain-other";
+}
+
 function initThreadRegistry(){
   const st = initCommon();
 
@@ -572,7 +451,6 @@ function initThreadRegistry(){
     const openItems = st.inbox.filter(i=>i.status!=="archived").sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
     inboxEl.innerHTML = openItems.length ? openItems.map(i=>`
       <div class="item">
-        <div class="domain-strip"></div>
         <strong>${escapeHtml(i.text)}</strong>
         <div class="meta">
           <span class="pill">Inbox</span>
@@ -631,9 +509,9 @@ function initThreadRegistry(){
       const inSlot = (st.weekly.slot1===t.id || st.weekly.slot2===t.id);
       const pill = inSlot ? `<span class="pill good">Active this week</span>` : `<span class="pill">Backlog</span>`;
       return `
-        <div class="item">
-        <div class="domain-strip"></div>
-        <strong>${domainIcon(t.domain)} ${escapeHtml(t.title)}</strong>
+        <div class="item ${domainClass(t.domain)}">
+          <div class="domain-strip"></div>
+          <strong>${escapeHtml(t.title)}</strong>
           <div class="meta">
             ${pill}
             ${t.domain ? `<span class="pill">${escapeHtml(t.domain)}</span>` : ``}
@@ -756,7 +634,6 @@ function initLifeMap(){
   function render(){
     domainsEl.innerHTML = st.lifeMap.domains.map(d=>`
       <div class="item">
-        <div class="domain-strip"></div>
         <strong>${escapeHtml(d.name)}</strong>
         <label>Notes / current focus</label>
         <textarea data-domain="${d.id}">${escapeHtml(d.notes||"")}</textarea>
@@ -802,7 +679,6 @@ function initIncomeMap(){
     checkpointsEl.innerHTML = cp.map(x=>{
       const tone = w && w >= x.w ? "good" : "warn";
       return `<div class="item">
-        <div class="domain-strip"></div>
         <strong>${escapeHtml(x.label)}</strong>
         <div class="meta">
           <span class="pill ${tone}">${w && w>=x.w ? "Reached" : "Upcoming"}</span>
@@ -822,9 +698,6 @@ function initIncomeMap(){
 
 // --- Page router ---
 document.addEventListener("DOMContentLoaded", ()=>{
-  try{ document.body.dataset.jsLoaded="1"; }catch(e){}
-
-  applyUI();
   const page = document.body.getAttribute("data-page");
   if(page==="quick") initQuickCapture();
   else if(page==="registry") initThreadRegistry();
