@@ -1,4 +1,4 @@
-const BUILD_VERSION = 'v13';
+const BUILD_VERSION = 'v14';
 console.log('Planner build', BUILD_VERSION);
 
 // Planner (Thread System) - localStorage-first, plus optional GitHub Gist sync.
@@ -1094,7 +1094,7 @@ function initIncomeMap(){
 
 // --- Page router ---
 document.addEventListener("DOMContentLoaded", ()=>{
-  const page = document.body.getAttribute("data-page");
+  const page = (document.body.getAttribute("data-page")||"").toLowerCase();
   if(page==="quick") initQuickCapture();
   else if(page==="registry") initThreadRegistry();
   else if(page==="lifemap") initLifeMap();
