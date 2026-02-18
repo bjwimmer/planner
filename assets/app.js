@@ -1,3 +1,6 @@
+const BUILD_VERSION = 'v13';
+console.log('Planner build', BUILD_VERSION);
+
 // Planner (Thread System) - localStorage-first, plus optional GitHub Gist sync.
 
 const STORE_KEY = "planner.data.v1";
@@ -8,19 +11,190 @@ const GIST_FILENAME = "planner-data.json";
 function nowIso(){ return new Date().toISOString(); }
 function uid(){ return Math.random().toString(16).slice(2) + "-" + Date.now().toString(16); }
 
+function defaultLifeMap(){
+  const domains = ["Income","Financial","Home","Health","Relationships"];
+  const emptyDomainsObj = ()=> Object.fromEntries(domains.map(d=>[d, []]));
+  const lm = {
+    version: 2,
+    domains,
+    defaultUrgency: "medium",
+    horizons: {
+      week:   { label: "This Week",   domains: emptyDomainsObj() },
+      month:  { label: "This Month",  domains: emptyDomainsObj() },
+      quarter:{ label: "3 Months",    domains: emptyDomainsObj() }
+    }
+  };
+
+  // Preload Claude content into 3 Months, Medium urgency
+  const now = nowIso();
+  const mkGoal = (title, notes)=>({ id: uid(), title, notes: notes||"", urgency:"medium", createdAt: now, updatedAt: now, linkedThreadIds: [] });
+
+  // Income
+  lm.horizons.quarter.domains["Income"].push(
+    mkGoal("Etsy", [
+      "T-shirts for fundraising",
+      "Cards",
+      "Mugs",
+      "New items",
+      "Fundraising (Michael J. Fox / Parkinson’s Foundation)"
+    ].join("\n")),
+    mkGoal("Self-employment", [
+      "Construction knowledge / instruction / lead-manager",
+      "Craft options"
+    ].join("\n"))
+  );
+
+  // Financial
+  lm.horizons.quarter.domains["Financial"].push(
+    mkGoal("Investigate health plan", ""),
+    mkGoal("Budget & Bill Review", [
+      "Cancel subscriptions",
+      "Review all bills"
+    ].join("\n"))
+  );
+
+  // Home
+  lm.horizons.quarter.domains["Home"].push(
+    mkGoal("Sell items", [
+      "Tools",
+      "Snowblower (get running)",
+      "Hyundai (brakes)"
+    ].join("\n")),
+    mkGoal("Give away items", [
+      "Clothing",
+      "Miscellaneous kitchen items",
+      "Miscellaneous household items"
+    ].join("\n")),
+    mkGoal("Sell house?", [
+      "See clean out progress",
+      "Research selling options (Full realtor vs Partial self-sell)"
+    ].join("\n"))
+  );
+
+  // Health
+  lm.horizons.quarter.domains["Health"].push(
+    mkGoal("ADHD", [
+      "Med change?",
+      "Continue coaching"
+    ].join("\n")),
+    mkGoal("Parkinson’s", [
+      "Exercise (Walking, E-biking)",
+      "Handicap placard"
+    ].join("\n"))
+  );
+
+  // Relationships (empty)
+  return lm;
+}
+
+function ensureLifeMapSchema(st){
+  if(!st.lifeMap){ st.lifeMap = defaultLifeMap(); return; }
+  // migrate old schema (domains array) -> new schema
+  if(st.lifeMap && Array.isArray(st.lifeMap.domains) && !st.lifeMap.horizons){
+    const old = st.lifeMap.domains;
+    st.lifeMap = defaultLifeMap();
+    // Try to copy old notes into quarter domain titles if names roughly match
+    old.forEach(d=>{
+      const name = (d.name||"").toLowerCase();
+      const notes = (d.notes||"").trim();
+      if(!notes) return;
+      const mapTo = name.includes("health") ? "Health"
+        : (name.includes("home") ? "Home"
+        : (name.includes("relat") ? "Relationships"
+        : (name.includes("income")||name.includes("work") ? "Income"
+        : (name.includes("fin") ? "Financial" : null))));
+      if(mapTo){
+        st.lifeMap.horizons.quarter.domains[mapTo].unshift({
+          id: uid(), title: "Imported notes", notes, urgency:"medium",
+          createdAt: nowIso(), updatedAt: nowIso(), linkedThreadIds:[]
+        });
+      }
+    });
+    return;
+  }
+  // Ensure required fields
+  if(!st.lifeMap.version || st.lifeMap.version < 2){
+    const fresh = defaultLifeMap();
+    st.lifeMap = { ...fresh, ...st.lifeMap, version: 2 };
+  }
+  if(!st.lifeMap.horizons){ st.lifeMap.horizons = defaultLifeMap().horizons; }
+  if(!st.lifeMap.domains){ st.lifeMap.domains = ["Income","Financial","Home","Health","Relationships"]; }
+  const domains = st.lifeMap.domains;
+  const ensureDomains = (h)=>{
+    if(!h.domains) h.domains = {};
+    domains.forEach(d=>{ if(!Array.isArray(h.domains[d])) h.domains[d]=[]; });
+  };
+  ensureDomains(st.lifeMap.horizons.week ||= {label:"This Week", domains:{}});
+  ensureDomains(st.lifeMap.horizons.month ||= {label:"This Month", domains:{}});
+  ensureDomains(st.lifeMap.horizons.quarter ||= {label:"3 Months", domains:{}});
+}
+
+
+function normalizeLifeMap(lm){
+  // Accept older schemas and upgrade them to current lifeMap v2 with horizons {week, month, quarter}
+  if(!lm || typeof lm !== 'object') return defaultLifeMap();
+
+  // If horizons exist but use threeMonths key, normalize to quarter
+  if(lm.horizons && typeof lm.horizons === 'object'){
+    if(lm.horizons.threeMonths && !lm.horizons.quarter){
+      lm.horizons.quarter = lm.horizons.threeMonths;
+      delete lm.horizons.threeMonths;
+    }
+    const hasWeek = lm.horizons.week && lm.horizons.week.domains;
+    const hasMonth = lm.horizons.month && lm.horizons.month.domains;
+    const hasQuarter = lm.horizons.quarter && lm.horizons.quarter.domains;
+    if(hasWeek && hasMonth && hasQuarter){
+      if(!lm.domains) lm.domains = ["Income","Financial","Home","Health","Relationships"];
+      if(!lm.defaultUrgency) lm.defaultUrgency = "medium";
+      return lm;
+    }
+  }
+
+  // If domains are stored directly as an object map {Domain:[goals...]}
+  if(lm.domains && !Array.isArray(lm.domains) && typeof lm.domains === 'object' && !lm.horizons){
+    const fresh = defaultLifeMap();
+    fresh.horizons.quarter.domains = Object.assign(fresh.horizons.quarter.domains, lm.domains);
+    return fresh;
+  }
+
+  // If there's an array of domains with goals (old Claude-ish structure)
+  if(Array.isArray(lm.domains) && !lm.horizons){
+    const fresh = defaultLifeMap();
+    // Try to import simple [{name:'Health', goals:[{title, notes:[..]}]}]
+    try{
+      lm.domains.forEach(d=>{
+        const name = d.name || d.title || d.domain;
+        if(!name) return;
+        const normName = String(name).trim();
+        const list = d.goals || d.items || [];
+        if(!Array.isArray(list)) return;
+        list.forEach(g=>{
+          const title = g.title || g.name;
+          if(!title) return;
+          const notesArr = g.notes || g.sub || g.items || [];
+          const notes = Array.isArray(notesArr) ? notesArr.join("\n") : (g.notesText || "");
+          const now = nowIso();
+          fresh.horizons.quarter.domains[normName] = fresh.horizons.quarter.domains[normName] || [];
+          fresh.horizons.quarter.domains[normName].push({ id: uid(), title: String(title), notes: notes||"", urgency: (g.urgency||"medium"), createdAt: now, updatedAt: now, linkedThreadIds: [] });
+        });
+      });
+      return fresh;
+    }catch(e){
+      return fresh;
+    }
+  }
+
+  // Fallback
+  return defaultLifeMap();
+}
+
 function defaultState(){
   return {
     meta: { createdAt: nowIso(), updatedAt: nowIso(), title: "Planner" },
     inbox: [], // {id, text, createdAt, status:'open'|'archived'}
     threads: [], // {id,title,status,domain,nextAction,notes,createdAt,updatedAt}
     weekly: { slot1: null, slot2: null, weekOf: null }, // weekOf ISO date (Monday)
-    lifeMap: { domains: [
-      { id: uid(), name:"Health", notes:"" },
-      { id: uid(), name:"Work / Income", notes:"" },
-      { id: uid(), name:"Relationships", notes:"" },
-      { id: uid(), name:"Home / Environment", notes:"" },
-      { id: uid(), name:"Creative / Meaning", notes:"" }
-    ]},
+    lifeMap: defaultLifeMap(),
     incomeMap: { startDate: null } // YYYY-MM-DD
   };
 }
@@ -36,7 +210,7 @@ function loadState(){
     if(!st.inbox) st.inbox = [];
     if(!st.threads) st.threads = [];
     if(!st.weekly) st.weekly = { slot1:null, slot2:null, weekOf:null };
-    if(!st.lifeMap) st.lifeMap = defaultState().lifeMap;
+    st.lifeMap = normalizeLifeMap(st.lifeMap);
     if(!st.incomeMap) st.incomeMap = { startDate:null };
 
     return st;
@@ -98,6 +272,8 @@ function weekNumberFromStart(startYmd){
 // --- Export / Import ---
 function exportJson(){
   const st = loadState();
+  ensureLifeMapSchema(st);
+  saveState(st);
   const blob = new Blob([JSON.stringify(st,null,2)], {type:"application/json"});
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -187,6 +363,8 @@ async function githubPush(){
   if(!cfg?.gistId || !cfg?.token) throw new Error("Not connected. Add Gist ID and token in Sync.");
 
   const st = loadState();
+  ensureLifeMapSchema(st);
+  saveState(st);
 
   const res = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
     method: "PATCH",
@@ -317,6 +495,8 @@ async function autoPullIfEnabled(){
 // --- Page Initializers ---
 function initCommon(){
   const st = loadState();
+  ensureLifeMapSchema(st);
+  saveState(st);
   setActiveNav();
   renderFooter(st);
 
@@ -413,6 +593,22 @@ function initThreadRegistry(){
   const inboxEl = document.querySelector("#registryInbox");
   const threadsEl = document.querySelector("#threadsList");
   const form = document.querySelector("#newThreadForm");
+
+  // --- Add thread UX: disable submit until title has text ---
+  const addBtn = form ? form.querySelector('button[type="submit"]') : null;
+  const titleInput = document.querySelector("#tTitle");
+  function updateAddBtn(){
+    if(!addBtn || !titleInput) return;
+    const ok = (titleInput.value || "").trim().length > 0;
+    addBtn.disabled = !ok;
+    addBtn.style.opacity = ok ? "1" : ".55";
+    addBtn.style.cursor = ok ? "pointer" : "not-allowed";
+  }
+  if(titleInput){
+    titleInput.addEventListener("input", updateAddBtn);
+    updateAddBtn();
+  }
+
 
   const slot1Sel = document.querySelector("#slot1");
   const slot2Sel = document.querySelector("#slot2");
@@ -629,33 +825,233 @@ function initThreadRegistry(){
 // --- Strategic Life Map ---
 function initLifeMap(){
   const st = initCommon();
-  const domainsEl = document.querySelector("#domains");
 
-  function render(){
-    domainsEl.innerHTML = st.lifeMap.domains.map(d=>`
-      <div class="item">
-        <strong>${escapeHtml(d.name)}</strong>
-        <label>Notes / current focus</label>
-        <textarea data-domain="${d.id}">${escapeHtml(d.notes||"")}</textarea>
-        <div class="row" style="margin-top:10px">
-          <button class="btn primary" data-save="${d.id}">Save</button>
+  const root = document.querySelector("#lifeMapRoot");
+  if(!root) return;
+
+  const horizons = ["week","month","quarter"];
+  const domains = st.lifeMap.domains;
+
+  function goalRow(hKey, domain, g){
+    const dClass = domainClass(domain);
+    const urgency = g.urgency || st.lifeMap.defaultUrgency || "medium";
+    const notesLines = (g.notes||"").split("\n").filter(x=>x.trim());
+    const mini = notesLines.slice(0,3).map(x=>`<li>${escapeHtml(x)}</li>`).join("");
+    const more = notesLines.length>3 ? `<div class="small">+${notesLines.length-3} more</div>` : "";
+    const leftBtn = (hKey!=="week") ? `<button class="btn" data-demote="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">⬅</button>` : `<span></span>`;
+    const rightBtn = (hKey!=="quarter") ? `<button class="btn" data-promote="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">➡</button>` : `<span></span>`;
+    return `
+      <div class="goal ${dClass}">
+        <div class="domain-strip"></div>
+        <div class="goal-head">
+          <div>
+            <strong>${escapeHtml(g.title||"")}</strong>
+            <div class="meta">
+              <span class="pill ${urgencyPill(urgency)}">${urgencyLabel(urgency)}</span>
+              <span class="pill">${escapeHtml(domain)}</span>
+            </div>
+          </div>
+          <div class="row" style="justify-content:flex-end; gap:8px">
+            ${leftBtn}
+            ${rightBtn}
+          </div>
+        </div>
+
+        <div class="row" style="gap:10px; align-items:flex-start">
+          <div style="flex:1 1 auto">
+            <label>Notes / sub-items</label>
+            <textarea data-notes="${g.id}" placeholder="One per line...">${escapeHtml(g.notes||"")}</textarea>
+          </div>
+          <div style="min-width:180px">
+            <label>Urgency</label>
+            <select data-urgency="${g.id}">
+              <option value="low" ${urgency==="low"?"selected":""}>Low</option>
+              <option value="medium" ${urgency==="medium"?"selected":""}>Medium</option>
+              <option value="high" ${urgency==="high"?"selected":""}>High</option>
+            </select>
+
+            <div style="height:10px"></div>
+            <button class="btn primary" data-save-goal="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">Save</button>
+            <div style="height:8px"></div>
+            <button class="btn good" data-thread-from-goal="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">🧵 Create Thread</button>
+            <div style="height:8px"></div>
+            <button class="btn bad" data-delete-goal="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">Delete</button>
+          </div>
         </div>
       </div>
-    `).join("");
+    `;
+  }
 
-    domainsEl.querySelectorAll("[data-save]").forEach(btn=>{
+  function render(){
+    root.innerHTML = `
+      <div class="horizon-grid">
+        ${horizons.map(hKey=>{
+          const h = st.lifeMap.horizons[hKey];
+          return `
+            <div class="hcol">
+              <div class="hcol-head">
+                <h2>${escapeHtml(h.label)}</h2>
+                <div class="kicker">Domains stay constant. Promote goals forward as they become urgent.</div>
+              </div>
+
+              ${domains.map(domain=>{
+                const dClass = domainClass(domain);
+                const list = h.domains[domain] || [];
+                return `
+                  <div class="domain-block ${dClass}">
+                    <div class="domain-strip"></div>
+                    <div class="domain-head">
+                      <div>
+                        <strong>${escapeHtml(domain)}</strong>
+                        <span class="small">${list.length} goal${list.length===1?"":"s"}</span>
+                      </div>
+                      <div class="row" style="gap:8px; justify-content:flex-end">
+                        <input class="mini-input" data-new-title="${hKey}::${escapeAttr(domain)}" placeholder="New goal title…">
+                        <button class="btn primary" data-add-goal="${hKey}" data-d="${escapeAttr(domain)}">Add</button>
+                      </div>
+                    </div>
+
+                    <div class="goal-list">
+                      ${list.map(g=>goalRow(hKey, domain, g)).join("") || `<div class="small" style="padding:10px 0">No goals yet.</div>`}
+                    </div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+
+    // Wire add goal
+    root.querySelectorAll("[data-add-goal]").forEach(btn=>{
       btn.addEventListener("click", ()=>{
-        const id = btn.getAttribute("data-save");
-        const dom = st.lifeMap.domains.find(x=>x.id===id);
-        const val = document.querySelector(`[data-domain="${id}"]`)?.value ?? "";
-        dom.notes = val.trim();
+        const hKey = btn.getAttribute("data-add-goal");
+        const domain = btn.getAttribute("data-d");
+        const key = `${hKey}::${domain}`;
+        const inp = root.querySelector(`[data-new-title="${cssEscape(key)}"]`);
+        const title = (inp?.value||"").trim();
+        if(!title){ alert("Type a goal title first."); inp?.focus?.(); return; }
+        const now = nowIso();
+        st.lifeMap.horizons[hKey].domains[domain].unshift({
+          id: uid(), title, notes:"", urgency: st.lifeMap.defaultUrgency || "medium",
+          createdAt: now, updatedAt: now, linkedThreadIds:[]
+        });
+        inp.value="";
+        saveState(st); renderFooter(st); render();
+      });
+    });
+
+    // Promote / demote
+    root.querySelectorAll("[data-promote]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-promote");
+        const hKey = btn.getAttribute("data-h");
+        const domain = btn.getAttribute("data-d");
+        moveGoal(id, hKey, domain, "promote");
+      });
+    });
+    root.querySelectorAll("[data-demote]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-demote");
+        const hKey = btn.getAttribute("data-h");
+        const domain = btn.getAttribute("data-d");
+        moveGoal(id, hKey, domain, "demote");
+      });
+    });
+
+    // Save / delete / thread
+    root.querySelectorAll("[data-save-goal]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-save-goal");
+        const hKey = btn.getAttribute("data-h");
+        const domain = btn.getAttribute("data-d");
+        const g = findGoal(hKey, domain, id);
+        if(!g) return;
+        const notes = root.querySelector(`[data-notes="${cssEscape(id)}"]`)?.value ?? "";
+        const urg = root.querySelector(`[data-urgency="${cssEscape(id)}"]`)?.value ?? "medium";
+        g.notes = notes.trim();
+        g.urgency = urg;
+        g.updatedAt = nowIso();
         saveState(st); renderFooter(st);
+      });
+    });
+
+    root.querySelectorAll("[data-delete-goal]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-delete-goal");
+        const hKey = btn.getAttribute("data-h");
+        const domain = btn.getAttribute("data-d");
+        if(!confirm("Delete this goal?")) return;
+        const list = st.lifeMap.horizons[hKey].domains[domain];
+        const idx = list.findIndex(x=>x.id===id);
+        if(idx>=0){ list.splice(idx,1); saveState(st); renderFooter(st); render(); }
+      });
+    });
+
+    root.querySelectorAll("[data-thread-from-goal]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-thread-from-goal");
+        const hKey = btn.getAttribute("data-h");
+        const domain = btn.getAttribute("data-d");
+        const g = findGoal(hKey, domain, id);
+        if(!g) return;
+
+        const now = nowIso();
+        const nextAction = firstLine(g.notes) || "First step: [describe 5–20 minute action]";
+        const thread = { id: Date.now(), title: g.title, status: "Not started - ready to begin", domain, nextAction, notes: `Linked from Life Map (${st.lifeMap.horizons[hKey].label}).
+
+${g.notes||""}`.trim(), createdAt: now, updatedAt: now };
+        st.threads.unshift(thread);
+        g.linkedThreadIds = Array.isArray(g.linkedThreadIds) ? g.linkedThreadIds : [];
+        g.linkedThreadIds.unshift(thread.id);
+        g.updatedAt = now;
+        saveState(st); renderFooter(st);
+        alert("Thread created. Go to Thread Registry to work it.");
       });
     });
   }
 
+  function firstLine(txt){
+    return (txt||"").split("\n").map(x=>x.trim()).find(Boolean) || "";
+  }
+
+  function findGoal(hKey, domain, id){
+    const list = st.lifeMap.horizons[hKey]?.domains?.[domain] || [];
+    return list.find(x=>x.id===id);
+  }
+
+  function moveGoal(id, hKey, domain, dir){
+    const order = ["week","month","quarter"];
+    const idx = order.indexOf(hKey);
+    const target = dir==="promote" ? order[Math.max(0, idx-1)] : order[Math.min(order.length-1, idx+1)];
+    // promote means toward week (more urgent): quarter -> month -> week
+    const fromKey = hKey;
+    const toKey = target;
+
+    if(fromKey===toKey) return;
+
+    const fromList = st.lifeMap.horizons[fromKey].domains[domain];
+    const i = fromList.findIndex(x=>x.id===id);
+    if(i<0) return;
+    const [g] = fromList.splice(i,1);
+    g.updatedAt = nowIso();
+    st.lifeMap.horizons[toKey].domains[domain].unshift(g);
+
+    saveState(st); renderFooter(st); render();
+  }
+
+  // Helpers for UI labels
+  function urgencyLabel(u){ return u==="high"?"High":(u==="low"?"Low":"Medium"); }
+  function urgencyPill(u){ return u==="high"?"bad":(u==="low"?"good":"warn"); }
+
+  function cssEscape(s){
+    return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_\-]/g, "\$&");
+  }
+
   render();
 }
+
 
 // --- Income Map ---
 function initIncomeMap(){
@@ -704,4 +1100,12 @@ document.addEventListener("DOMContentLoaded", ()=>{
   else if(page==="lifemap") initLifeMap();
   else if(page==="income") initIncomeMap();
   else initCommon();
+});
+
+
+document.addEventListener("DOMContentLoaded", ()=>{
+  try{
+    const el = document.querySelector("[data-build]");
+    if(el) el.textContent = BUILD_VERSION;
+  }catch(e){}
 });

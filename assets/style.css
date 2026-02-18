@@ -249,3 +249,65 @@ html[data-color="plus"] .card::before{
     rgba(217,119,6,.94)
   );
 }
+
+
+/* --- Strategic Life Map (v11) --- */
+.horizon-grid{
+  display:grid;
+  grid-template-columns: 1fr 1fr 1.2fr; /* 3 Months a bit wider */
+  gap:16px;
+  align-items:start;
+}
+@media (max-width: 980px){
+  .horizon-grid{ grid-template-columns: 1fr; }
+}
+.hcol{
+  background: rgba(255,255,255,.86);
+  border:1px solid rgba(215,222,233,.95);
+  border-radius: 18px;
+  padding:14px;
+  box-shadow: 0 10px 26px rgba(15,23,42,.08);
+}
+.hcol-head h2{ margin:0 0 6px; font-size:18px; }
+.domain-block{
+  position:relative;
+  margin-top:12px;
+  border:1px solid rgba(215,222,233,.95);
+  border-radius: 18px;
+  padding:12px 12px 10px;
+  background: rgba(255,255,255,.92);
+  box-shadow: 0 8px 18px rgba(15,23,42,.06);
+  overflow:hidden;
+}
+.domain-head{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:center;
+  margin-bottom:10px;
+}
+.mini-input{
+  width: 220px;
+  max-width: 44vw;
+  padding:10px 12px;
+  border-radius: 14px;
+  border:1px solid rgba(215,222,233,.95);
+  background: rgba(255,255,255,.96);
+}
+.goal{
+  position:relative;
+  border:1px solid rgba(215,222,233,.95);
+  border-radius: 18px;
+  padding:12px;
+  background: rgba(255,255,255,.94);
+  box-shadow: 0 10px 22px rgba(15,23,42,.08);
+  margin-bottom:10px;
+}
+.goal-head{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:flex-start;
+}
+.goal .meta{ margin-top:6px; gap:8px; flex-wrap:wrap; display:flex; }
+.goal-list{ display:flex; flex-direction:column; }
