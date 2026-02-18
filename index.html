@@ -3,82 +3,24 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Planner</title>
-  <link rel="stylesheet" href="assets/style.v10.css"/>
+  <title>Planner · Redirecting…</title>
+  <link rel="stylesheet" href="assets/style.v11.css"/>
 </head>
-<body>
+<body data-page="home">
 
   <div class="topbar">
     <div class="container">
-      <div class="row" style="justify-content:space-between">
-        <div class="brand">
-          <span style="font-size:20px">🧭</span>
-          <span>Planner</span>
-          <span class="badge" data-sync-indicator>● Not connected</span><span class="badge" data-build>v?</span>
-        </div>
-        <div class="row" style="gap:8px">
-          <button class="btn" data-open-sync>Sync</button>
-          <button class="btn" data-export>Export</button>
-          <label class="btn" style="cursor:pointer">
-            Import <input type="file" accept="application/json" data-import style="display:none">
-          </label>
-        </div>
-      </div>
-
-      <div class="nav">
-        <a data-nav href="index.html">Home</a>
-        <a data-nav href="quick-capture.html">⚡ Quick Capture</a>
-        <a data-nav href="thread-registry.html">Thread Registry</a>
-        <a data-nav href="strategic-life-map.html">Strategic Life Map</a>
-        <a data-nav href="income-map.html">90-Day Income Map</a>
-        <a data-nav href="how-it-works.html">How This Works</a>
-      </div>
+    <div class="card">
+      <h2>Opening Strategic Life Map…</h2>
+      <p class="kicker">If you are not redirected automatically, click below.</p>
+      <a class="btn primary" href="strategic-life-map.html">Go to Strategic Life Map</a>
     </div>
   </div>
 
-
-  <div class="container">
-    <div class="grid">
-      <div class="card">
-        <h2>Start here</h2>
-        <p>If your brain is loud, don’t negotiate with it. Pick a lane:</p>
-        <div class="row">
-          <a class="btn primary" href="quick-capture.html">I’m overloaded → Quick Capture</a>
-          <a class="btn good" href="thread-registry.html">I’m ready → Thread Registry</a>
-        </div>
-        <hr/>
-        <p class="kicker">
-          Your data lives locally in your browser, and optionally in a GitHub Gist (<span class="mono">planner-data.json</span>).
-          With Sync connected, pages auto-pull on load; you push manually when you want to publish changes.
-        </p>
-      </div>
-
-      <div class="card">
-        <h2>What this protects</h2>
-        <p><strong>Mode switching is expensive.</strong> So we separate:</p>
-        <div class="list">
-          <div class="item">
-            <strong>Capture mode</strong>
-            <div class="meta"><span class="pill">Quick</span><span class="pill">No decisions</span></div>
-            <p class="small">Dump it. Don’t judge it.</p>
-          </div>
-          <div class="item">
-            <strong>Execution mode</strong>
-            <div class="meta"><span class="pill good">Two active threads</span><span class="pill">Micro-actions</span></div>
-            <p class="small">Work the runway. Keep the rest in holding.</p>
-          </div>
-          <div class="item">
-            <strong>Big-picture mode</strong>
-            <div class="meta"><span class="pill">Life map</span><span class="pill warn">Scheduled only</span></div>
-            <p class="small">Strategic thinking, not procrastination cosplay.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="footer" data-footer></div>
-  </div>
-
+  <script>
+    // Make the Life Map the primary landing page
+    window.location.replace("strategic-life-map.html");
+  </script>
 
   <!-- Sync Modal -->
   <div class="modal-backdrop" id="syncModalBackdrop" aria-hidden="true">
@@ -114,6 +56,6 @@
   </div>
 
 
-  <script src="assets/app.v10.js"></script>
+  <script src="assets/app.v11.js"></script>
 </body>
 </html>
