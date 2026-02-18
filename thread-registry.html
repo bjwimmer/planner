@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Thread Registry · Planner</title>
-  <link rel="stylesheet" href="assets/style.v9.css"/>
+  <link rel="stylesheet" href="assets/style.v10.css"/>
 </head>
 <body data-page="registry">
 
@@ -14,7 +14,7 @@
         <div class="brand">
           <span style="font-size:20px">🧵</span>
           <span>Thread Registry</span>
-          <span class="badge" data-sync-indicator>● Not connected</span><span class="badge" data-build>v9</span>
+          <span class="badge" data-sync-indicator>● Not connected</span><span class="badge" data-build>v?</span>
         </div>
         <div class="row" style="gap:8px">
           <button class="btn" data-open-sync>Sync</button>
@@ -62,10 +62,9 @@
 
         <hr/>
         <h3>Create a thread</h3>
-<form id="createThreadForm" data-create-thread-form>
         <form id="newThreadForm">
           <label>Thread title</label>
-          <input id="tTitle" placeholder="Example: 'Med leave paperwork' or 'Etsy: 3 new listings'"/ id="threadTitle" data-thread-title>
+          <input id="tTitle" placeholder="Example: 'Med leave paperwork' or 'Etsy: 3 new listings'"/>
           <div class="grid">
             <div>
               <label>Domain (optional)</label>
@@ -73,11 +72,11 @@
             </div>
             <div>
               <label>Next micro-action (5–20 min)</label>
-              <input id="tNext" placeholder="Example: Open doc and write 5 bullets"/ id="threadNext" data-thread-next>
+              <input id="tNext" placeholder="Example: Open doc and write 5 bullets"/>
             </div>
           </div>
           <div class="row" style="margin-top:10px">
-            <button class="btn primary" type="submit" type="submit" id="addThreadBtn" data-add-thread>Add thread</button>
+            <button class="btn primary" type="submit">Add thread</button>
           </div>
         </form>
       </div>
@@ -94,8 +93,7 @@
       <div id="threadsList" class="list"></div>
     </div>
 
-    </form>
-<div class="footer" data-footer></div>
+    <div class="footer" data-footer></div>
   </div>
 
 
@@ -133,6 +131,6 @@
   </div>
 
 
-  <script src="assets/app.v9.js"></script>
+  <script src="assets/app.v10.js"></script>
 </body>
 </html>
