@@ -197,3 +197,35 @@ body[data-page="how"] .topbar{ background: rgba(248,250,252,.88); }
 }
 .modal-header{display:flex; justify-content:space-between; align-items:center; gap:10px}
 .modal-title{ font-size:20px; font-weight:800; }
+
+
+/* Nav color hints (professional) */
+.nav a[data-nav][href="quick-capture.html"]{ border-color: rgba(217,119,6,.35); }
+.nav a[data-nav][href="quick-capture.html"].active{ background: rgba(217,119,6,.12); border-color: rgba(217,119,6,.55); box-shadow: 0 0 0 3px rgba(217,119,6,.10) inset, 0 12px 22px rgba(217,119,6,.12); }
+
+.nav a[data-nav][href="thread-registry.html"]{ border-color: rgba(5,150,105,.30); }
+.nav a[data-nav][href="thread-registry.html"].active{ background: rgba(5,150,105,.10); border-color: rgba(5,150,105,.50); box-shadow: 0 0 0 3px rgba(5,150,105,.10) inset, 0 12px 22px rgba(5,150,105,.12); }
+
+.nav a[data-nav][href="strategic-life-map.html"]{ border-color: rgba(124,58,237,.30); }
+.nav a[data-nav][href="strategic-life-map.html"].active{ background: rgba(124,58,237,.10); border-color: rgba(124,58,237,.50); box-shadow: 0 0 0 3px rgba(124,58,237,.10) inset, 0 12px 22px rgba(124,58,237,.12); }
+
+.nav a[data-nav][href="income-map.html"]{ border-color: rgba(37,99,235,.30); }
+.nav a[data-nav][href="income-map.html"].active{ background: rgba(37,99,235,.10); border-color: rgba(37,99,235,.55); }
+
+/* Dopamine mode: same structure, higher color energy (toggleable) */
+body.dopamine{
+  background:
+    radial-gradient(1100px 700px at 10% 6%, rgba(37,99,235,.18), transparent 55%),
+    radial-gradient(900px 560px at 88% 18%, rgba(124,58,237,.16), transparent 60%),
+    radial-gradient(900px 560px at 80% 82%, rgba(5,150,105,.12), transparent 60%),
+    var(--bg);
+}
+body.dopamine .card::before{
+  height:12px;
+  background: linear-gradient(90deg,
+    rgba(37,99,235,.98),
+    rgba(124,58,237,.92),
+    rgba(5,150,105,.88),
+    rgba(217,119,6,.92)
+  );
+}

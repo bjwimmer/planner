@@ -3,6 +3,8 @@
 const STORE_KEY = "planner.data.v1";
 const SYNC_KEY  = "planner.sync.v1"; // {gistId, token, autoPull:true}
 const AUTO_PULL_SESSION_KEY = "planner.autoPulled.v1";
+const UI_KEY = "planner.ui.v1"; // {dopamine:boolean}
+
 const GIST_FILENAME = "planner-data.json";
 
 function nowIso(){ return new Date().toISOString(); }
@@ -51,6 +53,18 @@ function saveState(st){
   localStorage.setItem(STORE_KEY, JSON.stringify(st));
 }
 
+
+function loadUI(){
+  try{ return JSON.parse(localStorage.getItem(UI_KEY) || "null") || {dopamine:false}; }
+  catch{ return {dopamine:false}; }
+}
+function saveUI(ui){ localStorage.setItem(UI_KEY, JSON.stringify(ui)); }
+function applyUI(){
+  const ui = loadUI();
+  if(ui.dopamine) document.body.classList.add("dopamine");
+  else document.body.classList.remove("dopamine");
+}
+
 function setActiveNav(){
   const path = (location.pathname.split("/").pop() || "index.html").toLowerCase();
   document.querySelectorAll("[data-nav]").forEach(a=>{
@@ -97,6 +111,18 @@ function weekNumberFromStart(startYmd){
 
 
 // --- Domain auto-color mapping ---
+
+function domainIcon(domainRaw){
+  const d = (domainRaw || "").trim().toLowerCase();
+  if(!d) return "🧩";
+  if(d.includes("health")) return "🩺";
+  if(d.includes("home")) return "🏠";
+  if(d.includes("work") || d.includes("income") || d.includes("money") || d.includes("job") || d.includes("career")) return "💼";
+  if(d.includes("relationship") || d.includes("family") || d.includes("social")) return "🤝";
+  if(d.includes("creative") || d.includes("meaning") || d.includes("writing") || d.includes("art")) return "✨";
+  return "🧩";
+}
+
 function domainClass(domainRaw){
   const d = (domainRaw || "").trim().toLowerCase();
   if(!d) return "domain-other";
@@ -239,6 +265,21 @@ function closeModal(){
   const back = document.getElementById("syncModalBackdrop");
   if(back) back.style.display = "none";
 }
+
+function openAdmin(){
+  const back = document.getElementById("adminModalBackdrop");
+  if(back) back.style.display = "flex";
+}
+function closeAdmin(){
+  const back = document.getElementById("adminModalBackdrop");
+  if(back) back.style.display = "none";
+}
+function wireAdmin(){
+  const openBtn = document.querySelector("[data-open-admin]");
+  if(openBtn) openBtn.addEventListener("click", openAdmin);
+  document.querySelectorAll("[data-close-admin]").forEach(b=>b.addEventListener("click", closeAdmin));
+}
+
 function wireModal(){
   const openBtn = document.querySelector("[data-open-sync]");
   if(openBtn) openBtn.addEventListener("click", openModal);
@@ -354,6 +395,21 @@ function initCommon(){
 
   setSyncIndicator();
   wireModal();
+  wireAdmin();
+
+  const dopBtn = document.querySelector('[data-toggle-dopamine]');
+  if(dopBtn){
+    dopBtn.addEventListener('click', ()=>{
+      const ui = loadUI();
+      ui.dopamine = !ui.dopamine;
+      saveUI(ui);
+      applyUI();
+      dopBtn.textContent = ui.dopamine ? 'Color +' : 'Color';
+    });
+    const ui = loadUI();
+    dopBtn.textContent = ui.dopamine ? 'Color +' : 'Color';
+  }
+
   autoPullIfEnabled();
 
   return st;
@@ -515,7 +571,7 @@ function initThreadRegistry(){
       return `
         <div class="item">
         <div class="domain-strip"></div>
-        <strong>${escapeHtml(t.title)}</strong>
+        <strong>${domainIcon(t.domain)} ${escapeHtml(t.title)}</strong>
           <div class="meta">
             ${pill}
             ${t.domain ? `<span class="pill">${escapeHtml(t.domain)}</span>` : ``}
@@ -704,6 +760,7 @@ function initIncomeMap(){
 
 // --- Page router ---
 document.addEventListener("DOMContentLoaded", ()=>{
+  applyUI();
   const page = document.body.getAttribute("data-page");
   if(page==="quick") initQuickCapture();
   else if(page==="registry") initThreadRegistry();
