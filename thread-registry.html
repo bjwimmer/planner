@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Thread Registry · Planner</title>
-  <link rel="stylesheet" href="assets/style.v7.css"/>
+  <link rel="stylesheet" href="assets/style.v8.css"/>
 </head>
 <body data-page="registry">
 
@@ -14,7 +14,7 @@
         <div class="brand">
           <span style="font-size:20px">🧵</span>
           <span>Thread Registry</span>
-          <span class="badge" data-sync-indicator>● Not connected</span><span class="badge" data-build>v?</span>
+          <span class="badge" data-sync-indicator>● Not connected</span><span class="badge" data-build>v8</span>
         </div>
         <div class="row" style="gap:8px">
           <button class="btn" data-open-sync>Sync</button>
@@ -62,9 +62,10 @@
 
         <hr/>
         <h3>Create a thread</h3>
+<form id="createThreadForm" data-create-thread-form>
         <form id="newThreadForm">
           <label>Thread title</label>
-          <input id="tTitle" placeholder="Example: 'Med leave paperwork' or 'Etsy: 3 new listings'"/>
+          <input id="tTitle" placeholder="Example: 'Med leave paperwork' or 'Etsy: 3 new listings'" id="threadTitle" data-thread-title/>
           <div class="grid">
             <div>
               <label>Domain (optional)</label>
@@ -72,11 +73,11 @@
             </div>
             <div>
               <label>Next micro-action (5–20 min)</label>
-              <input id="tNext" placeholder="Example: Open doc and write 5 bullets"/>
+              <input id="tNext" placeholder="Example: Open doc and write 5 bullets" id="threadNext" data-thread-next/>
             </div>
           </div>
           <div class="row" style="margin-top:10px">
-            <button class="btn primary" type="submit">Add thread</button>
+            <button class="btn primary" type="submit" type="submit" id="addThreadBtn" data-add-thread>Add thread</button>
           </div>
         </form>
       </div>
@@ -131,6 +132,6 @@
   </div>
 
 
-  <script src="assets/app.v7.js"></script>
+  <script src="assets/app.v8.js"></script>
 </body>
 </html>
