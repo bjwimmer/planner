@@ -140,14 +140,36 @@ function normalizeLifeMap(lm){
       lm.horizons.quarter = lm.horizons.threeMonths;
       delete lm.horizons.threeMonths;
     }
-    const hasWeek = lm.horizons.week && lm.horizons.week.domains;
-    const hasMonth = lm.horizons.month && lm.horizons.month.domains;
-    const hasQuarter = lm.horizons.quarter && lm.horizons.quarter.domains;
-    if(hasWeek && hasMonth && hasQuarter){
-      if(!lm.domains) lm.domains = ["Income","Financial","Home","Health","Relationships"];
-      if(!lm.defaultUrgency) lm.defaultUrgency = "medium";
-      return lm;
+    // If it's already close to the current schema, normalize missing bits instead of resetting.
+    if(!lm.domains) lm.domains = ["Income","Financial","Home","Health","Relationships"];
+    // Domains can arrive as strings or objects; keep a simple string array.
+    if(Array.isArray(lm.domains)){
+      lm.domains = lm.domains
+        .map(d => (typeof d === 'string') ? d : (d?.name || d?.title || d?.domain || ""))
+        .map(s => String(s||"").trim())
+        .filter(Boolean);
     }
+    if(!lm.defaultUrgency) lm.defaultUrgency = "medium";
+
+    // Ensure week/month/quarter exist and have a .domains object.
+    const ensureH = (key, title) => {
+      if(!lm.horizons[key] || typeof lm.horizons[key] !== 'object') lm.horizons[key] = { title, domains: {} };
+      if(!lm.horizons[key].title) lm.horizons[key].title = title;
+      if(!lm.horizons[key].domains || typeof lm.horizons[key].domains !== 'object') lm.horizons[key].domains = {};
+    };
+    ensureH('week', 'This week');
+    ensureH('month', 'This month');
+    ensureH('quarter', '3 months');
+
+    // Ensure each domain key maps to an array for every horizon.
+    const horizonKeys = ['week','month','quarter'];
+    lm.domains.forEach(domainName=>{
+      horizonKeys.forEach(hk=>{
+        if(!Array.isArray(lm.horizons[hk].domains[domainName])) lm.horizons[hk].domains[domainName] = [];
+      });
+    });
+
+    return lm;
   }
 
   // If domains are stored directly as an object map {Domain:[goals...]}
