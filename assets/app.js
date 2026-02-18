@@ -822,6 +822,8 @@ function initIncomeMap(){
 
 // --- Page router ---
 document.addEventListener("DOMContentLoaded", ()=>{
+  try{ document.body.dataset.jsLoaded="1"; }catch(e){}
+
   applyUI();
   const page = document.body.getAttribute("data-page");
   if(page==="quick") initQuickCapture();
