@@ -1,4 +1,4 @@
-const BUILD_VERSION = 'v19';
+const BUILD_VERSION = 'v20';
 console.log('Planner build', BUILD_VERSION);
 
 // Planner (Thread System) - localStorage-first, plus optional GitHub Gist sync.
@@ -649,6 +649,13 @@ function initThreadRegistry(){
     updateAddBtn();
   }
 
+  // Domain dropdown: pull from Life Map domains so it stays consistent
+  const domainSelect = document.querySelector("#tDomain");
+  if(domainSelect){
+    const domains = (st.lifeMap && Array.isArray(st.lifeMap.domains) && st.lifeMap.domains.length) ? st.lifeMap.domains : DEFAULT_DOMAINS;
+    domainSelect.innerHTML = `<option value="">— none —</option>` + domains.map(d => `<option value="${escapeAttr(d)}">${escapeHtml(d)}</option>`).join("");
+  }
+
 
   const slot1Sel = document.querySelector("#slot1");
   const slot2Sel = document.querySelector("#slot2");
@@ -777,6 +784,7 @@ function initThreadRegistry(){
             <button class="btn primary" data-save="${t.id}">Save</button>
             <button class="btn" data-focus="${t.id}">Focus this week</button>
             <button class="btn warn" data-copy="${t.id}">Copy micro-action</button>
+            <button class="btn danger" data-delete="${t.id}">Delete</button>
           </div>
         </div>
       `;
@@ -830,13 +838,12 @@ function initThreadRegistry(){
       });
     });
 
-      document.querySelectorAll("[data-delete]").forEach(btn=>{
+      threadsEl.querySelectorAll("[data-delete]").forEach(btn=>{
         btn.addEventListener("click", () => {
           const id = btn.getAttribute("data-delete");
-          const st = loadState();
-          const th = st.threads.find(x=>x.id===id);
+            const th = st.threads.find(x=>x.id===id);
           if(!th) return;
-          const ok = confirm(`Delete thread "${th.name}"?\n\nThis cannot be undone.`);
+          const ok = confirm(`Delete thread "${th.title || th.name || "this thread"}"?\n\nThis cannot be undone.`);
           if(!ok) return;
           st.threads = st.threads.filter(x=>x.id!==id);
           // remove from weekly slots if present
