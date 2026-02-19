@@ -1,4 +1,4 @@
-const BUILD_VERSION = 'v22';
+const BUILD_VERSION = 'v23';
 console.log('Planner build', BUILD_VERSION);
 
 // Planner (Thread System) - localStorage-first, plus optional GitHub Gist sync.
@@ -1196,4 +1196,28 @@ document.addEventListener("DOMContentLoaded", ()=>{
     const el = document.querySelector("[data-build]");
     if(el) el.textContent = BUILD_VERSION;
   }catch(e){}
+});
+
+// Auto-archive: if status is set to archived, persist immediately (no Save click needed)
+document.addEventListener("change", (ev) => {
+  const sel = ev.target;
+  if(!(sel instanceof HTMLSelectElement)) return;
+  if(!sel.matches("[data-thread-status]")) return;
+  const threadId = sel.getAttribute("data-thread-status");
+  const val = (sel.value || "").toString().trim().toLowerCase();
+  if(val === "archived" || val === "archive" || val === "done" || val === "completed" || val === "complete"){
+    try{
+      const st = loadState();
+      const t = (st.threads || []).find(x => String(x.id) === String(threadId));
+      if(t){
+        t.status = "archived";
+        t.lastTouched = nowIso();
+        if(t.updatedAt !== undefined) t.updatedAt = t.lastTouched;
+        saveState(st);
+      }
+      if(typeof initThreadRegistry === "function") initThreadRegistry();
+    }catch(e){
+      console.error("Auto-archive failed", e);
+    }
+  }
 });
