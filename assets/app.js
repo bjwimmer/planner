@@ -1,4 +1,4 @@
-const BUILD_VERSION = 'v24';
+const BUILD_VERSION = 'v25';
 console.log('Planner build', BUILD_VERSION);
 
 // Planner (Thread System) - localStorage-first, plus optional GitHub Gist sync.
@@ -1225,29 +1225,75 @@ document.addEventListener("change", (ev) => {
 
 
 function initOverview(){
-  const root = document.querySelector("#app") || document.body;
   const state = loadState();
-  const domains = state.lifeMap?.domains || [];
-  let html = '<div class="overview-layout"><div class="overview-main">';
-  domains.forEach(d=>{
-    html += `<div class="overview-domain"><h2>${d}</h2>`;
-    const threads = (state.threads||[]).filter(t=>t.domain===d && t.status!=="archived");
-    if(!threads.length){
-      html += '<div class="overview-empty">No active threads</div>';
-    }else{
-      threads.forEach(t=>{
-        html += `<div class="overview-thread">${t.title||t.name}</div>`;
-      });
-    }
-    html+='</div>';
+  const root = document.body;
+
+  const threads = (state.threads||[]).filter(t=>t.status!=="archived");
+
+  // sort by urgency + updated
+  const urgencyOrder = {high:0, medium:1, low:2};
+  threads.sort((a,b)=>{
+    const ua = urgencyOrder[(a.urgency||'medium').toLowerCase()] ?? 1;
+    const ub = urgencyOrder[(b.urgency||'medium').toLowerCase()] ?? 1;
+    if(ua!==ub) return ua-ub;
+    return new Date(b.lastTouched||0)-new Date(a.lastTouched||0);
   });
-  html+='</div>';
-  const active = (state.threads||[]).filter(t=>t.status!=="archived").length;
-  const archived = (state.threads||[]).filter(t=>t.status==="archived").length;
-  html+=`<div class="overview-pulse">
-    <h3>Momentum</h3>
-    <div>Active Threads: ${active}</div>
-    <div>Archived: ${archived}</div>
-  </div></div>`;
+
+  const top = threads.slice(0,3);
+
+  const domains = state.lifeMap?.domains||[];
+
+  let html = '<div style="display:flex;gap:30px;padding:30px;">';
+
+  html += '<div style="flex:3;">';
+  html += '<h1>🔥 Most Urgent</h1>';
+
+  if(top.length===0){
+    html += '<div>No active threads.</div>';
+  }else{
+    top.forEach(t=>{
+      html += `<div style="padding:15px;margin-bottom:15px;border-left:6px solid #ff6b00;background:#111;">
+                <div style="font-size:18px;font-weight:bold;">${t.title||t.name}</div>
+                <div style="opacity:0.7;">Domain: ${t.domain||'—'}</div>
+               </div>`;
+    });
+  }
+
+  html += '<h2 style="margin-top:40px;">Structure</h2>';
+
+  domains.forEach(d=>{
+    html += `<div style="margin-bottom:15px;"><strong>${d}</strong>`;
+    const domainThreads = threads.filter(t=>t.domain===d);
+    if(domainThreads.length){
+      html += '<ul>';
+      domainThreads.forEach(t=>{
+        html += `<li>${t.title||t.name}</li>`;
+      });
+      html += '</ul>';
+    }else{
+      html += '<div style="opacity:0.5;">No active threads</div>';
+    }
+    html += '</div>';
+  });
+
+  html += '</div>';
+
+  // momentum panel
+  const completedWeek = (state.threads||[]).filter(t=>{
+    if(t.status!=="archived") return false;
+    const dt = new Date(t.lastTouched||0);
+    const now = new Date();
+    const diff = (now-dt)/(1000*60*60*24);
+    return diff<=7;
+  }).length;
+
+  html += '<div style="flex:1;border-left:1px solid #333;padding-left:20px;">';
+  html += '<h3>Momentum</h3>';
+  html += `<div>Active Threads: ${threads.length}</div>`;
+  html += `<div>Completed (7d): ${completedWeek}</div>`;
+  html += '</div>';
+
+  html += '</div>';
+
   root.innerHTML = html;
 }
