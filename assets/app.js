@@ -1,4 +1,4 @@
-const BUILD_VERSION = 'v20';
+const BUILD_VERSION = 'v21';
 console.log('Planner build', BUILD_VERSION);
 
 // Planner (Thread System) - localStorage-first, plus optional GitHub Gist sync.
@@ -219,6 +219,30 @@ function defaultState(){
     lifeMap: defaultLifeMap(),
     incomeMap: { startDate: null } // YYYY-MM-DD
   };
+}
+
+function normalizeStatus(s){
+  const v = (s ?? "").toString().trim().toLowerCase();
+  if(!v) return "active";
+  if(v === "archive" || v === "archived" || v === "done" || v === "completed" || v === "complete") return "archived";
+  if(v.includes("archiv")) return "archived";
+  if(v.includes("done") || v.includes("complete")) return "archived";
+  // keep legacy labels as-is, but treat them as active in filtering
+  return s;
+}
+function normalizeThread(t){
+  if(!t || typeof t !== "object") return null;
+  // normalize id
+  if(t.id === undefined || t.id === null) t.id = Date.now();
+  // normalize title/name
+  if(!t.title && t.name) t.title = t.name;
+  if(!t.name && t.title) t.name = t.title;
+  // normalize timestamps
+  if(!t.updatedAt && t.lastTouched) t.updatedAt = t.lastTouched;
+  if(!t.lastTouched && t.updatedAt) t.lastTouched = t.updatedAt;
+  // normalize status
+  t.status = normalizeStatus(t.status);
+  return t;
 }
 
 function loadState(){
