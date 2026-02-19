@@ -1,4 +1,4 @@
-const BUILD_VERSION = 'v21';
+const BUILD_VERSION = 'v22';
 console.log('Planner build', BUILD_VERSION);
 
 // Planner (Thread System) - localStorage-first, plus optional GitHub Gist sync.
@@ -601,7 +601,7 @@ function initQuickCapture(){
     list.querySelectorAll("[data-arch]").forEach(btn=>{
       btn.addEventListener("click", ()=>{
         const id = btn.getAttribute("data-arch");
-        const it = st.inbox.find(x=>x.id===id);
+        const it = st.inbox.find(x=>String(x.id)===String(id));
         if(it){ it.status="archived"; saveState(st); renderFooter(st); render(); }
       });
     });
@@ -700,7 +700,7 @@ function initThreadRegistry(){
       st.threads
         .filter(t=>t.status!=="archived")
         .sort((a,b)=>a.title.localeCompare(b.title))
-        .map(t=>`<option value="${t.id}" ${t.id===selectedId?"selected":""}>${escapeHtml(t.title)}</option>`)
+        .map(t=>`<option value="${t.id}" ${String(t.id)===String(selectedId)?"selected":""}>${escapeHtml(t.title)}</option>`)
     );
     return opts.join("");
   }
@@ -732,7 +732,7 @@ function initThreadRegistry(){
     inboxEl.querySelectorAll("[data-arch]").forEach(btn=>{
       btn.addEventListener("click", ()=>{
         const id = btn.getAttribute("data-arch");
-        const it = st.inbox.find(x=>x.id===id);
+        const it = st.inbox.find(x=>String(x.id)===String(id));
         if(it){ it.status="archived"; saveState(st); renderFooter(st); render(); }
       });
     });
@@ -740,7 +740,7 @@ function initThreadRegistry(){
     inboxEl.querySelectorAll("[data-mkthread]").forEach(btn=>{
       btn.addEventListener("click", ()=>{
         const id = btn.getAttribute("data-mkthread");
-        const it = st.inbox.find(x=>x.id===id);
+        const it = st.inbox.find(x=>String(x.id)===String(id));
         if(!it) return;
         const title = it.text.slice(0,80);
         const th = { id: uid(), title, status:"active", domain:"", nextAction:"", notes: it.text, createdAt: nowIso(), updatedAt: nowIso() };
@@ -753,7 +753,7 @@ function initThreadRegistry(){
     inboxEl.querySelectorAll("[data-append]").forEach(btn=>{
       btn.addEventListener("click", ()=>{
         const id = btn.getAttribute("data-append");
-        const it = st.inbox.find(x=>x.id===id);
+        const it = st.inbox.find(x=>String(x.id)===String(id));
         if(!it) return;
         const pick = prompt("Paste the exact thread title to append to (or cancel):");
         if(!pick) return;
@@ -773,7 +773,7 @@ function initThreadRegistry(){
       .sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
 
     threadsEl.innerHTML = activeThreads.length ? activeThreads.map(t=>{
-      const inSlot = (st.weekly.slot1===t.id || st.weekly.slot2===t.id);
+      const inSlot = (String(st.weekly.slot1)===String(t.id) || String(st.weekly.slot2)===String(t.id));
       const pill = inSlot ? `<span class="pill good">Active this week</span>` : `<span class="pill">Backlog</span>`;
       return `
         <div class="item ${domainClass(t.domain)}">
@@ -817,7 +817,7 @@ function initThreadRegistry(){
     threadsEl.querySelectorAll("[data-save]").forEach(btn=>{
       btn.addEventListener("click", ()=>{
         const id = btn.getAttribute("data-save");
-        const th = st.threads.find(x=>x.id===id);
+        const th = st.threads.find(x=>String(x.id)===String(id));
         if(!th) return;
 
         const next = document.querySelector(`[data-next="${id}"]`)?.value ?? "";
@@ -830,8 +830,8 @@ function initThreadRegistry(){
         th.updatedAt = nowIso();
 
         if(status==="archived"){
-          if(st.weekly.slot1===id) st.weekly.slot1=null;
-          if(st.weekly.slot2===id) st.weekly.slot2=null;
+          if(String(st.weekly.slot1)===String(id)) st.weekly.slot1=null;
+          if(String(st.weekly.slot2)===String(id)) st.weekly.slot2=null;
         }
 
         saveState(st); renderFooter(st); render();
@@ -851,7 +851,7 @@ function initThreadRegistry(){
     threadsEl.querySelectorAll("[data-copy]").forEach(btn=>{
       btn.addEventListener("click", async ()=>{
         const id = btn.getAttribute("data-copy");
-        const th = st.threads.find(x=>x.id===id);
+        const th = st.threads.find(x=>String(x.id)===String(id));
         if(!th) return;
         try{
           await navigator.clipboard.writeText(th.nextAction || "");
@@ -865,11 +865,11 @@ function initThreadRegistry(){
       threadsEl.querySelectorAll("[data-delete]").forEach(btn=>{
         btn.addEventListener("click", () => {
           const id = btn.getAttribute("data-delete");
-            const th = st.threads.find(x=>x.id===id);
+            const th = st.threads.find(x=>String(x.id)===String(id));
           if(!th) return;
           const ok = confirm(`Delete thread "${th.title || th.name || "this thread"}"?\n\nThis cannot be undone.`);
           if(!ok) return;
-          st.threads = st.threads.filter(x=>x.id!==id);
+          st.threads = st.threads.filter(x=>String(x.id)!==String(id));
           // remove from weekly slots if present
           if(st.weekly && st.weekly.slot1===id) st.weekly.slot1=null;
           if(st.weekly && st.weekly.slot2===id) st.weekly.slot2=null;
@@ -1072,7 +1072,7 @@ function initLifeMap(){
         const domain = btn.getAttribute("data-d");
         if(!confirm("Delete this goal?")) return;
         const list = st.lifeMap.horizons[hKey].domains[domain];
-        const idx = list.findIndex(x=>x.id===id);
+        const idx = list.findIndex(x=>String(x.id)===String(id));
         if(idx>=0){ list.splice(idx,1); saveState(st); renderFooter(st); render(); }
       });
     });
@@ -1106,7 +1106,7 @@ ${g.notes||""}`.trim(), createdAt: now, updatedAt: now };
 
   function findGoal(hKey, domain, id){
     const list = st.lifeMap.horizons[hKey]?.domains?.[domain] || [];
-    return list.find(x=>x.id===id);
+    return list.find(x=>String(x.id)===String(id));
   }
 
   function moveGoal(id, hKey, domain, dir){
@@ -1120,7 +1120,7 @@ ${g.notes||""}`.trim(), createdAt: now, updatedAt: now };
     if(fromKey===toKey) return;
 
     const fromList = st.lifeMap.horizons[fromKey].domains[domain];
-    const i = fromList.findIndex(x=>x.id===id);
+    const i = fromList.findIndex(x=>String(x.id)===String(id));
     if(i<0) return;
     const [g] = fromList.splice(i,1);
     g.updatedAt = nowIso();
