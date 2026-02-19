@@ -1,4 +1,4 @@
-const BUILD_VERSION = 'v25';
+const BUILD_VERSION = 'v27';
 console.log('Planner build', BUILD_VERSION);
 
 // Planner (Thread System) - localStorage-first, plus optional GitHub Gist sync.
@@ -1223,77 +1223,99 @@ document.addEventListener("change", (ev) => {
   }
 });
 
+function daysSince(dateStr){
+  if(!dateStr) return 999;
+  const dt = new Date(dateStr);
+  const now = new Date();
+  return (now - dt)/(1000*60*60*24);
+}
 
 function initOverview(){
   const state = loadState();
   const root = document.body;
+  const activeThreads = (state.threads||[]).filter(t=>t.status!=="archived");
 
-  const threads = (state.threads||[]).filter(t=>t.status!=="archived");
-
-  // sort by urgency + updated
   const urgencyOrder = {high:0, medium:1, low:2};
-  threads.sort((a,b)=>{
+  activeThreads.sort((a,b)=>{
     const ua = urgencyOrder[(a.urgency||'medium').toLowerCase()] ?? 1;
     const ub = urgencyOrder[(b.urgency||'medium').toLowerCase()] ?? 1;
     if(ua!==ub) return ua-ub;
     return new Date(b.lastTouched||0)-new Date(a.lastTouched||0);
   });
 
-  const top = threads.slice(0,3);
-
   const domains = state.lifeMap?.domains||[];
 
   let html = '<div style="display:flex;gap:30px;padding:30px;">';
-
   html += '<div style="flex:3;">';
-  html += '<h1>🔥 Most Urgent</h1>';
 
+  const top = activeThreads.slice(0,2);
+  html += '<div style="margin-bottom:25px;padding:15px;border:1px solid #333;background:#121212;">';
+  html += '<h2>🎯 Strategic Arc</h2>';
   if(top.length===0){
-    html += '<div>No active threads.</div>';
+    html += '<div>No active direction.</div>';
   }else{
     top.forEach(t=>{
-      html += `<div style="padding:15px;margin-bottom:15px;border-left:6px solid #ff6b00;background:#111;">
-                <div style="font-size:18px;font-weight:bold;">${t.title||t.name}</div>
-                <div style="opacity:0.7;">Domain: ${t.domain||'—'}</div>
-               </div>`;
+      html += `<div style="margin-bottom:10px;">
+        <strong>${t.title||t.name}</strong>
+        <div style="opacity:0.6;font-size:12px;">${t.domain||''}</div>
+      </div>`;
     });
   }
+  html += '</div>';
 
-  html += '<h2 style="margin-top:40px;">Structure</h2>';
+  const horizons = [
+    {key:"week", label:"This Week"},
+    {key:"month", label:"This Month"},
+    {key:"quarter", label:"3 Months"}
+  ];
 
-  domains.forEach(d=>{
-    html += `<div style="margin-bottom:15px;"><strong>${d}</strong>`;
-    const domainThreads = threads.filter(t=>t.domain===d);
-    if(domainThreads.length){
-      html += '<ul>';
+  horizons.forEach((h,i)=>{
+    const defaultOpen = (h.key==="week");
+    html += `<div style="margin-bottom:20px;">
+      <details ${defaultOpen?'open':''}>
+        <summary style="font-size:18px;font-weight:bold;cursor:pointer;">
+          ${h.label}
+        </summary>`;
+
+    domains.forEach(d=>{
+      const domainThreads = activeThreads.filter(t=>t.domain===d);
+      if(domainThreads.length===0) return;
+
+      html += `<div style="margin-left:15px;margin-top:10px;">
+        <strong>${d}</strong>
+        <ul style="margin-top:5px;">`;
+
       domainThreads.forEach(t=>{
-        html += `<li>${t.title||t.name}</li>`;
+        const stalled = daysSince(t.lastTouched)>14;
+        const dot = stalled ? "🟠" : "●";
+        html += `<li style="margin-bottom:4px;opacity:${stalled?0.6:1};">
+          ${dot} ${t.title||t.name}
+        </li>`;
       });
-      html += '</ul>';
-    }else{
-      html += '<div style="opacity:0.5;">No active threads</div>';
-    }
-    html += '</div>';
+
+      html += '</ul></div>';
+    });
+
+    html += '</details></div>';
   });
 
   html += '</div>';
 
-  // momentum panel
   const completedWeek = (state.threads||[]).filter(t=>{
     if(t.status!=="archived") return false;
-    const dt = new Date(t.lastTouched||0);
-    const now = new Date();
-    const diff = (now-dt)/(1000*60*60*24);
-    return diff<=7;
+    return daysSince(t.lastTouched)<=7;
   }).length;
+
+  const high = activeThreads.filter(t=>(t.urgency||'').toLowerCase()==='high').length;
+  const med = activeThreads.filter(t=>(t.urgency||'').toLowerCase()==='medium').length;
+  const low = activeThreads.filter(t=>(t.urgency||'').toLowerCase()==='low').length;
 
   html += '<div style="flex:1;border-left:1px solid #333;padding-left:20px;">';
   html += '<h3>Momentum</h3>';
-  html += `<div>Active Threads: ${threads.length}</div>`;
-  html += `<div>Completed (7d): ${completedWeek}</div>`;
+  html += `<div>Movement (7d): ${completedWeek}</div>`;
+  html += `<div>Intent → H:${high} M:${med} L:${low}</div>`;
   html += '</div>';
 
   html += '</div>';
-
   root.innerHTML = html;
 }
