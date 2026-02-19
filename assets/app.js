@@ -1,10 +1,48 @@
-const BUILD_VERSION = 'v27';
+const BUILD_VERSION = 'v27-test-guarded';
+
+
+/* === planner-test safeguards (auto-generated) === */
+const APP_FLAVOR = "planner-test";
+const DEFAULT_TEST_GIST_ID = "4364e296d9592d9953ce71ee346a2766";
+
+function ensureTestDefaults() {
+  try {
+    let cfg = null;
+    // Read whatever might already be stored under the test key
+    const raw = localStorage.getItem("plannerTest.sync.v1");
+    if (raw) {
+      try { cfg = JSON.parse(raw); } catch(e) { cfg = {}; }
+    } else {
+      cfg = {};
+    }
+    if (!cfg.gistId) cfg.gistId = DEFAULT_TEST_GIST_ID;
+    // Save ONLY to the planner-test key so we never touch production config.
+    localStorage.setItem("plannerTest.sync.v1", JSON.stringify(cfg));
+  } catch(e) {}
+}
+
+function injectTestRibbon(){
+  try {
+    if (document.getElementById("testRibbon")) return;
+    const d = document.createElement("div");
+    d.id = "testRibbon";
+    d.textContent = "TEST MODE";
+    document.body.appendChild(d);
+  } catch(e) {}
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  ensureTestDefaults();
+  injectTestRibbon();
+});
+/* === end planner-test safeguards === */
+
 console.log('Planner build', BUILD_VERSION);
 
 // Planner (Thread System) - localStorage-first, plus optional GitHub Gist sync.
 
-const STORE_KEY = "planner.data.v1";
-const SYNC_KEY  = "planner.sync.v1"; // {gistId, token, autoPull:true}
+const STORE_KEY = "plannerTest.data.v1";
+const SYNC_KEY  = "plannerTest.sync.v1"; // {gistId, token, autoPull:true}
 const AUTO_PULL_SESSION_KEY = "planner.autoPulled.v1";
 const GIST_FILENAME = "planner-data.json";
 
