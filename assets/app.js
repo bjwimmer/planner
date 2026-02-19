@@ -1,4 +1,4 @@
-const BUILD_VERSION = 'v23';
+const BUILD_VERSION = 'v24';
 console.log('Planner build', BUILD_VERSION);
 
 // Planner (Thread System) - localStorage-first, plus optional GitHub Gist sync.
@@ -1186,6 +1186,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
   if(page==="quick") initQuickCapture();
   else if(page==="registry") initThreadRegistry();
   else if(page==="lifemap") initLifeMap();
+  else if(page==="overview") initOverview();
   else if(page==="income") initIncomeMap();
   else initCommon();
 });
@@ -1221,3 +1222,32 @@ document.addEventListener("change", (ev) => {
     }
   }
 });
+
+
+function initOverview(){
+  const root = document.querySelector("#app") || document.body;
+  const state = loadState();
+  const domains = state.lifeMap?.domains || [];
+  let html = '<div class="overview-layout"><div class="overview-main">';
+  domains.forEach(d=>{
+    html += `<div class="overview-domain"><h2>${d}</h2>`;
+    const threads = (state.threads||[]).filter(t=>t.domain===d && t.status!=="archived");
+    if(!threads.length){
+      html += '<div class="overview-empty">No active threads</div>';
+    }else{
+      threads.forEach(t=>{
+        html += `<div class="overview-thread">${t.title||t.name}</div>`;
+      });
+    }
+    html+='</div>';
+  });
+  html+='</div>';
+  const active = (state.threads||[]).filter(t=>t.status!=="archived").length;
+  const archived = (state.threads||[]).filter(t=>t.status==="archived").length;
+  html+=`<div class="overview-pulse">
+    <h3>Momentum</h3>
+    <div>Active Threads: ${active}</div>
+    <div>Archived: ${archived}</div>
+  </div></div>`;
+  root.innerHTML = html;
+}
