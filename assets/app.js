@@ -1,4 +1,4 @@
-const BUILD_VERSION = 'v18';
+const BUILD_VERSION = 'v19';
 console.log('Planner build', BUILD_VERSION);
 
 // Planner (Thread System) - localStorage-first, plus optional GitHub Gist sync.
@@ -596,6 +596,20 @@ function initQuickCapture(){
     st.inbox.forEach(i=>i.status="archived");
     saveState(st); renderFooter(st); render();
   });
+  // Show archived toggle
+  const archToggle = document.querySelector('[data-toggle-archived]');
+  if(archToggle){
+    const st0 = loadState();
+    archToggle.checked = !!(st0.ui && st0.ui.showArchived);
+    archToggle.addEventListener('change', ()=>{
+      const st = loadState();
+      st.ui = st.ui || {};
+      st.ui.showArchived = archToggle.checked;
+      saveState(st);
+      render();
+    });
+  }
+
 
   render();
 }
@@ -751,7 +765,7 @@ function initThreadRegistry(){
                 <option value="active" ${t.status==="active"?"selected":""}>active</option>
                 <option value="paused" ${t.status==="paused"?"selected":""}>paused</option>
                 <option value="done" ${t.status==="done"?"selected":""}>done</option>
-                <option value="archived">archived</option>
+                <option value="archived" ${t.status==='archived'?'selected':''}>archived</option>
               </select>
             </div>
           </div>
@@ -815,6 +829,23 @@ function initThreadRegistry(){
         }
       });
     });
+
+      document.querySelectorAll("[data-delete]").forEach(btn=>{
+        btn.addEventListener("click", () => {
+          const id = btn.getAttribute("data-delete");
+          const st = loadState();
+          const th = st.threads.find(x=>x.id===id);
+          if(!th) return;
+          const ok = confirm(`Delete thread "${th.name}"?\n\nThis cannot be undone.`);
+          if(!ok) return;
+          st.threads = st.threads.filter(x=>x.id!==id);
+          // remove from weekly slots if present
+          if(st.weekly && st.weekly.slot1===id) st.weekly.slot1=null;
+          if(st.weekly && st.weekly.slot2===id) st.weekly.slot2=null;
+          saveState(st);
+          render();
+        });
+      });
   }
 
   function render(){
