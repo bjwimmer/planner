@@ -351,36 +351,3 @@ html[data-color="plus"] .card::before{
 .goal-card .row{
   flex-wrap: wrap;
 }
-
-
-/* v28 lifemap vertical */
-
-.lm-stack { max-width: 1200px; margin: 0 auto; padding: 18px; }
-.lm-topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
-.lm-topbar h1 { margin:0; font-size: 20px; }
-.lm-horizon { margin: 14px 0; border: 1px solid rgba(255,255,255,.12); border-radius: 14px; overflow:hidden; }
-.lm-horizon summary { cursor:pointer; padding: 12px 14px; font-weight: 700; display:flex; align-items:center; justify-content:space-between; gap:10px; background: rgba(255,255,255,.06); }
-.lm-horizon summary::-webkit-details-marker { display:none; }
-.lm-horizon .lm-hdr-meta { font-weight:600; opacity:.75; font-size: 12px; white-space:nowrap; }
-.lm-horizon .lm-body { padding: 10px 12px 14px; }
-.lm-domain { margin-top: 10px; border-radius: 12px; overflow:hidden; border: 1px solid rgba(255,255,255,.10); }
-.lm-domain summary { padding: 10px 12px; font-weight: 700; background: rgba(255,255,255,.05); display:flex; justify-content:space-between; gap:10px; }
-.lm-domain summary::-webkit-details-marker { display:none; }
-.lm-domain .lm-domain-meta { font-size: 12px; opacity:.7; white-space:nowrap; }
-.lm-domain .lm-domain-body { padding: 10px 12px 12px; }
-.lm-addrow { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom: 10px; }
-.lm-goals { display:flex; flex-direction:column; gap:8px; }
-.lm-card { border: 1px solid rgba(255,255,255,.10); border-radius: 12px; padding: 10px 10px; background: rgba(0,0,0,.18); }
-.lm-card-top { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
-.lm-title { font-weight: 800; }
-.lm-pill { font-size: 11px; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,.18); opacity:.9; }
-.lm-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top: 8px; }
-.lm-actions button { border-radius: 10px; }
-.lm-muted { opacity:.7; }
-@media (prefers-color-scheme: light){
-  .lm-horizon { border-color: rgba(0,0,0,.12); }
-  .lm-horizon summary { background: rgba(0,0,0,.04); }
-  .lm-domain { border-color: rgba(0,0,0,.10); }
-  .lm-domain summary { background: rgba(0,0,0,.03); }
-  .lm-card { background: rgba(255,255,255,.75); border-color: rgba(0,0,0,.10); }
-}

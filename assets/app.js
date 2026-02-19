@@ -1,4 +1,4 @@
-const BUILD_VERSION = 'v28';
+const BUILD_VERSION = 'v27';
 console.log('Planner build', BUILD_VERSION);
 
 // Planner (Thread System) - localStorage-first, plus optional GitHub Gist sync.
@@ -912,220 +912,232 @@ function initThreadRegistry(){
 
 // --- Strategic Life Map ---
 function initLifeMap(){
-  const state = loadState();
+  const st = initCommon();
 
-  // Ensure minimal shape exists
-  if(!state.lifeMap) state.lifeMap = { version: 2, domains: ["Income","Financial","Home","Health","Relationships"], defaultUrgency: "medium", horizons: {} };
-  if(!Array.isArray(state.lifeMap.domains)) state.lifeMap.domains = ["Income","Financial","Home","Health","Relationships"];
-  if(!state.lifeMap.horizons || typeof state.lifeMap.horizons !== "object") state.lifeMap.horizons = {};
-  const horizons = [
-    { key: "week", label: "This Week", open: true },
-    { key: "month", label: "This Month", open: false },
-    { key: "quarter", label: "3 Months", open: false },
-  ];
+  const root = document.querySelector("#lifeMapRoot");
+  if(!root) return;
 
-  // normalize buckets: horizons[key].domains[domain] -> []
-  horizons.forEach(h=>{
-    if(!state.lifeMap.horizons[h.key]) state.lifeMap.horizons[h.key] = { domains: {} };
-    if(!state.lifeMap.horizons[h.key].domains || typeof state.lifeMap.horizons[h.key].domains !== "object") state.lifeMap.horizons[h.key].domains = {};
-    state.lifeMap.domains.forEach(d=>{
-      if(!Array.isArray(state.lifeMap.horizons[h.key].domains[d])) state.lifeMap.horizons[h.key].domains[d] = [];
-    });
-  });
+  const horizons = ["week","month","quarter"];
+  const domains = st.lifeMap.domains;
 
-  saveState(state);
-
-  const root = document.querySelector("#app") || document.body;
-
-  const countIn = (hKey) => {
-    const doms = state.lifeMap.horizons[hKey].domains;
-    let n = 0;
-    state.lifeMap.domains.forEach(d=> n += (doms[d]||[]).length);
-    return n;
-  };
-
-  // Build HTML
-  let html = `
-    <div class="lm-stack">
-      <div class="lm-topbar">
-        <h1>Strategic Life Map</h1>
-        <div class="lm-muted">Build ${BUILD_VERSION}</div>
-      </div>
-  `;
-
-  horizons.forEach(h=>{
-    const total = countIn(h.key);
-    const hiCount = (() => {
-      let c=0;
-      const doms = state.lifeMap.horizons[h.key].domains;
-      state.lifeMap.domains.forEach(d=>{
-        (doms[d]||[]).forEach(g=>{
-          const u = (g.urgency || state.lifeMap.defaultUrgency || "medium").toLowerCase();
-          if(u==="high") c++;
-        });
-      });
-      return c;
-    })();
-
-    html += `
-      <details class="lm-horizon" ${h.open ? "open" : ""} data-horizon="${h.key}">
-        <summary>
-          <span>${h.label}</span>
-          <span class="lm-hdr-meta">${total} goals${hiCount?` • ${hiCount} High`:``}</span>
-        </summary>
-        <div class="lm-body">
-    `;
-
-    state.lifeMap.domains.forEach(domain=>{
-      const goals = state.lifeMap.horizons[h.key].domains[domain] || [];
-      const high = goals.filter(g=>((g.urgency||state.lifeMap.defaultUrgency||"medium").toLowerCase()==="high")).length;
-      html += `
-        <details class="lm-domain" data-domain="${escapeAttr(domain)}" data-horizon="${h.key}">
-          <summary>
-            <span>${domain}</span>
-            <span class="lm-domain-meta">${goals.length} goals${high?` • ${high} High`:``}</span>
-          </summary>
-          <div class="lm-domain-body">
-            <div class="lm-addrow">
-              <input type="text" placeholder="Add goal…" data-lm-new-title="${escapeAttr(h.key)}::${escapeAttr(domain)}" />
-              <select data-lm-new-urgency="${escapeAttr(h.key)}::${escapeAttr(domain)}">
-                <option value="high">High</option>
-                <option value="medium" selected>Medium</option>
-                <option value="low">Low</option>
-              </select>
-              <button class="btn" data-lm-add-goal="${escapeAttr(h.key)}::${escapeAttr(domain)}">Add</button>
-            </div>
-            <div class="lm-goals">
-      `;
-
-      if(goals.length===0){
-        html += `<div class="lm-muted">No goals yet.</div>`;
-      } else {
-        goals.forEach(g=>{
-          const title = g.title || g.name || "(untitled)";
-          const urgency = (g.urgency || state.lifeMap.defaultUrgency || "medium").toLowerCase();
-          const pill = urgency === "high" ? "High" : urgency === "low" ? "Low" : "Medium";
-          html += `
-            <div class="lm-card" data-lm-goal-card="${escapeAttr(h.key)}::${escapeAttr(domain)}::${escapeAttr(String(g.id))}">
-              <div class="lm-card-top">
-                <div>
-                  <div class="lm-title">${escapeHtml(title)}</div>
-                  ${g.notes ? `<div class="lm-muted">${escapeHtml(g.notes)}</div>` : ``}
-                </div>
-                <span class="lm-pill">${pill}</span>
-              </div>
-              <div class="lm-actions">
-                <button class="btn" data-lm-demote="${escapeAttr(h.key)}::${escapeAttr(domain)}::${escapeAttr(String(g.id))}">←</button>
-                <button class="btn" data-lm-promote="${escapeAttr(h.key)}::${escapeAttr(domain)}::${escapeAttr(String(g.id))}">→</button>
-                <button class="btn" data-lm-edit="${escapeAttr(h.key)}::${escapeAttr(domain)}::${escapeAttr(String(g.id))}">Edit</button>
-                <button class="btn danger" data-lm-delete="${escapeAttr(h.key)}::${escapeAttr(domain)}::${escapeAttr(String(g.id))}">Delete</button>
-              </div>
-            </div>
-          `;
-        });
-      }
-
-      html += `
+  function goalRow(hKey, domain, g){
+    const dClass = domainClass(domain);
+    const urgency = g.urgency || st.lifeMap.defaultUrgency || "medium";
+    const notesLines = (g.notes||"").split("\n").filter(x=>x.trim());
+    const mini = notesLines.slice(0,3).map(x=>`<li>${escapeHtml(x)}</li>`).join("");
+    const more = notesLines.length>3 ? `<div class="small">+${notesLines.length-3} more</div>` : "";
+    const leftBtn = (hKey!=="week") ? `<button class="btn" data-demote="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">⬅</button>` : `<span></span>`;
+    const rightBtn = (hKey!=="quarter") ? `<button class="btn" data-promote="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">➡</button>` : `<span></span>`;
+    return `
+      <div class="goal ${dClass}">
+        <div class="domain-strip"></div>
+        <div class="goal-head">
+          <div>
+            <strong>${escapeHtml(g.title||"")}</strong>
+            <div class="meta">
+              <span class="pill ${urgencyPill(urgency)}">${urgencyLabel(urgency)}</span>
+              <span class="pill">${escapeHtml(domain)}</span>
             </div>
           </div>
-        </details>
-      `;
+          <div class="row" style="justify-content:flex-end; gap:8px">
+            ${leftBtn}
+            ${rightBtn}
+          </div>
+        </div>
+
+        <div class="row" style="gap:10px; align-items:flex-start">
+          <div style="flex:1 1 auto">
+            <label>Notes / sub-items</label>
+            <textarea data-notes="${g.id}" placeholder="One per line...">${escapeHtml(g.notes||"")}</textarea>
+          </div>
+          <div style="min-width:180px">
+            <label>Urgency</label>
+            <select data-urgency="${g.id}">
+              <option value="low" ${urgency==="low"?"selected":""}>Low</option>
+              <option value="medium" ${urgency==="medium"?"selected":""}>Medium</option>
+              <option value="high" ${urgency==="high"?"selected":""}>High</option>
+            </select>
+
+            <div style="height:10px"></div>
+            <button class="btn primary" data-save-goal="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">Save</button>
+            <div style="height:8px"></div>
+            <button class="btn good" data-thread-from-goal="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">🧵 Create Thread</button>
+            <div style="height:8px"></div>
+            <button class="btn bad" data-delete-goal="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">Delete</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function render(){
+    root.innerHTML = `
+      <div class="horizon-grid">
+        ${horizons.map(hKey=>{
+          const h = st.lifeMap.horizons[hKey];
+          return `
+            <div class="hcol">
+              <div class="hcol-head">
+                <h2>${escapeHtml(h.label)}</h2>
+                <div class="kicker">Domains stay constant. Promote goals forward as they become urgent.</div>
+              </div>
+
+              ${domains.map(domain=>{
+                const dClass = domainClass(domain);
+                const list = h.domains[domain] || [];
+                return `
+                  <div class="domain-block ${dClass}">
+                    <div class="domain-strip"></div>
+                    <div class="domain-head">
+                      <div>
+                        <strong>${escapeHtml(domain)}</strong>
+                        <span class="small">${list.length} goal${list.length===1?"":"s"}</span>
+                      </div>
+                      <div class="row" style="gap:8px; justify-content:flex-end">
+                        <input class="mini-input" data-new-title="${hKey}::${escapeAttr(domain)}" placeholder="New goal title…">
+                        <button class="btn primary" data-add-goal="${hKey}" data-d="${escapeAttr(domain)}">Add</button>
+                      </div>
+                    </div>
+
+                    <div class="goal-list">
+                      ${list.map(g=>goalRow(hKey, domain, g)).join("") || `<div class="small" style="padding:10px 0">No goals yet.</div>`}
+                    </div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+
+    // Wire add goal
+    root.querySelectorAll("[data-add-goal]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const hKey = btn.getAttribute("data-add-goal");
+        const domain = btn.getAttribute("data-d");
+        const key = `${hKey}::${domain}`;
+        const inp = root.querySelector(`[data-new-title="${cssEscape(key)}"]`);
+        const title = (inp?.value||"").trim();
+        if(!title){ alert("Type a goal title first."); inp?.focus?.(); return; }
+        const now = nowIso();
+        st.lifeMap.horizons[hKey].domains[domain].unshift({
+          id: uid(), title, notes:"", urgency: st.lifeMap.defaultUrgency || "medium",
+          createdAt: now, updatedAt: now, linkedThreadIds:[]
+        });
+        inp.value="";
+        saveState(st); renderFooter(st); render();
+      });
     });
 
-    html += `
-        </div>
-      </details>
-    `;
-  });
+    // Promote / demote
+    root.querySelectorAll("[data-promote]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-promote");
+        const hKey = btn.getAttribute("data-h");
+        const domain = btn.getAttribute("data-d");
+        moveGoal(id, hKey, domain, "promote");
+      });
+    });
+    root.querySelectorAll("[data-demote]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-demote");
+        const hKey = btn.getAttribute("data-h");
+        const domain = btn.getAttribute("data-d");
+        moveGoal(id, hKey, domain, "demote");
+      });
+    });
 
-  html += `</div>`;
-  root.innerHTML = html;
+    // Save / delete / thread
+    root.querySelectorAll("[data-save-goal]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-save-goal");
+        const hKey = btn.getAttribute("data-h");
+        const domain = btn.getAttribute("data-d");
+        const g = findGoal(hKey, domain, id);
+        if(!g) return;
+        const notes = root.querySelector(`[data-notes="${cssEscape(id)}"]`)?.value ?? "";
+        const urg = root.querySelector(`[data-urgency="${cssEscape(id)}"]`)?.value ?? "medium";
+        g.notes = notes.trim();
+        g.urgency = urg;
+        g.updatedAt = nowIso();
+        saveState(st); renderFooter(st);
+      });
+    });
 
-  // Wire handlers (delegated)
-  root.addEventListener("click", (ev) => {
-    const el = ev.target;
-    if(!(el instanceof HTMLElement)) return;
+    root.querySelectorAll("[data-delete-goal]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-delete-goal");
+        const hKey = btn.getAttribute("data-h");
+        const domain = btn.getAttribute("data-d");
+        if(!confirm("Delete this goal?")) return;
+        const list = st.lifeMap.horizons[hKey].domains[domain];
+        const idx = list.findIndex(x=>String(x.id)===String(id));
+        if(idx>=0){ list.splice(idx,1); saveState(st); renderFooter(st); render(); }
+      });
+    });
 
-    const addKey = el.getAttribute("data-lm-add-goal");
-    if(addKey){
-      const [hKey, domain] = addKey.split("::");
-      const titleEl = root.querySelector(`[data-lm-new-title="${CSS.escape(hKey)}::${CSS.escape(domain)}"]`);
-      const urgEl = root.querySelector(`[data-lm-new-urgency="${CSS.escape(hKey)}::${CSS.escape(domain)}"]`);
-      const title = (titleEl && "value" in titleEl) ? String(titleEl.value).trim() : "";
-      const urgency = (urgEl && "value" in urgEl) ? String(urgEl.value).trim().toLowerCase() : (state.lifeMap.defaultUrgency||"medium");
-      if(!title){ alert("Add a goal name first."); return; }
-      const st = loadState();
-      const bucket = st.lifeMap.horizons[hKey].domains[domain];
-      bucket.push({ id: Date.now(), title, urgency, notes:"", createdAt: nowIso(), updatedAt: nowIso() });
-      saveState(st);
-      initLifeMap();
-      return;
-    }
+    root.querySelectorAll("[data-thread-from-goal]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-thread-from-goal");
+        const hKey = btn.getAttribute("data-h");
+        const domain = btn.getAttribute("data-d");
+        const g = findGoal(hKey, domain, id);
+        if(!g) return;
 
-    const parse = (v) => v ? v.split("::") : null;
+        const now = nowIso();
+        const nextAction = firstLine(g.notes) || "First step: [describe 5–20 minute action]";
+        const thread = { id: Date.now(), title: g.title, status: "Not started - ready to begin", domain, nextAction, notes: `Linked from Life Map (${st.lifeMap.horizons[hKey].label}).
 
-    const del = parse(el.getAttribute("data-lm-delete"));
-    if(del){
-      const [hKey, domain, gid] = del;
-      if(!confirm("Delete this goal? This cannot be undone.")) return;
-      const st = loadState();
-      const bucket = st.lifeMap.horizons[hKey].domains[domain] || [];
-      st.lifeMap.horizons[hKey].domains[domain] = bucket.filter(g=>String(g.id)!==String(gid));
-      saveState(st);
-      initLifeMap();
-      return;
-    }
+${g.notes||""}`.trim(), createdAt: now, updatedAt: now };
+        st.threads.unshift(thread);
+        g.linkedThreadIds = Array.isArray(g.linkedThreadIds) ? g.linkedThreadIds : [];
+        g.linkedThreadIds.unshift(thread.id);
+        g.updatedAt = now;
+        saveState(st); renderFooter(st);
+        alert("Thread created. Go to Thread Registry to work it.");
+      });
+    });
+  }
 
-    const edit = parse(el.getAttribute("data-lm-edit"));
-    if(edit){
-      const [hKey, domain, gid] = edit;
-      const st = loadState();
-      const bucket = st.lifeMap.horizons[hKey].domains[domain] || [];
-      const g = bucket.find(x=>String(x.id)===String(gid));
-      if(!g) return;
-      const title = prompt("Goal name:", g.title||"");
-      if(title===null) return;
-      g.title = title.trim();
-      const notes = prompt("Notes (optional):", g.notes||"");
-      if(notes===null) return;
-      g.notes = notes;
-      g.updatedAt = nowIso();
-      saveState(st);
-      initLifeMap();
-      return;
-    }
+  function firstLine(txt){
+    return (txt||"").split("\n").map(x=>x.trim()).find(Boolean) || "";
+  }
 
-    const move = (fromKey, toKey, domain, gid) => {
-      const st = loadState();
-      const from = st.lifeMap.horizons[fromKey].domains[domain] || [];
-      const idx = from.findIndex(x=>String(x.id)===String(gid));
-      if(idx<0) return;
-      const g = from.splice(idx,1)[0];
-      g.updatedAt = nowIso();
-      st.lifeMap.horizons[fromKey].domains[domain] = from;
-      st.lifeMap.horizons[toKey].domains[domain].push(g);
-      saveState(st);
-      initLifeMap();
-    };
+  function findGoal(hKey, domain, id){
+    const list = st.lifeMap.horizons[hKey]?.domains?.[domain] || [];
+    return list.find(x=>String(x.id)===String(id));
+  }
 
-    const prom = parse(el.getAttribute("data-lm-promote"));
-    if(prom){
-      const [hKey, domain, gid] = prom;
-      if(hKey==="week") return;
-      if(hKey==="month") move("month","week",domain,gid);
-      if(hKey==="quarter") move("quarter","month",domain,gid);
-      return;
-    }
+  function moveGoal(id, hKey, domain, dir){
+    const order = ["week","month","quarter"];
+    const idx = order.indexOf(hKey);
+    const target = dir==="promote" ? order[Math.max(0, idx-1)] : order[Math.min(order.length-1, idx+1)];
+    // promote means toward week (more urgent): quarter -> month -> week
+    const fromKey = hKey;
+    const toKey = target;
 
-    const dem = parse(el.getAttribute("data-lm-demote"));
-    if(dem){
-      const [hKey, domain, gid] = dem;
-      if(hKey==="quarter") return;
-      if(hKey==="week") move("week","month",domain,gid);
-      if(hKey==="month") move("month","quarter",domain,gid);
-      return;
-    }
-  });
+    if(fromKey===toKey) return;
+
+    const fromList = st.lifeMap.horizons[fromKey].domains[domain];
+    const i = fromList.findIndex(x=>String(x.id)===String(id));
+    if(i<0) return;
+    const [g] = fromList.splice(i,1);
+    g.updatedAt = nowIso();
+    st.lifeMap.horizons[toKey].domains[domain].unshift(g);
+
+    saveState(st); renderFooter(st); render();
+  }
+
+  // Helpers for UI labels
+  function urgencyLabel(u){ return u==="high"?"High":(u==="low"?"Low":"Medium"); }
+  function urgencyPill(u){ return u==="high"?"bad":(u==="low"?"good":"warn"); }
+
+  function cssEscape(s){
+    return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_\-]/g, "\$&");
+  }
+
+  render();
 }
 
 
@@ -1174,6 +1186,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
   if(page==="quick") initQuickCapture();
   else if(page==="registry") initThreadRegistry();
   else if(page==="lifemap") initLifeMap();
+  else if(page==="overview") initOverview();
   else if(page==="income") initIncomeMap();
   else initCommon();
 });
@@ -1209,3 +1222,100 @@ document.addEventListener("change", (ev) => {
     }
   }
 });
+
+function daysSince(dateStr){
+  if(!dateStr) return 999;
+  const dt = new Date(dateStr);
+  const now = new Date();
+  return (now - dt)/(1000*60*60*24);
+}
+
+function initOverview(){
+  const state = loadState();
+  const root = document.body;
+  const activeThreads = (state.threads||[]).filter(t=>t.status!=="archived");
+
+  const urgencyOrder = {high:0, medium:1, low:2};
+  activeThreads.sort((a,b)=>{
+    const ua = urgencyOrder[(a.urgency||'medium').toLowerCase()] ?? 1;
+    const ub = urgencyOrder[(b.urgency||'medium').toLowerCase()] ?? 1;
+    if(ua!==ub) return ua-ub;
+    return new Date(b.lastTouched||0)-new Date(a.lastTouched||0);
+  });
+
+  const domains = state.lifeMap?.domains||[];
+
+  let html = '<div style="display:flex;gap:30px;padding:30px;">';
+  html += '<div style="flex:3;">';
+
+  const top = activeThreads.slice(0,2);
+  html += '<div style="margin-bottom:25px;padding:15px;border:1px solid #333;background:#121212;">';
+  html += '<h2>🎯 Strategic Arc</h2>';
+  if(top.length===0){
+    html += '<div>No active direction.</div>';
+  }else{
+    top.forEach(t=>{
+      html += `<div style="margin-bottom:10px;">
+        <strong>${t.title||t.name}</strong>
+        <div style="opacity:0.6;font-size:12px;">${t.domain||''}</div>
+      </div>`;
+    });
+  }
+  html += '</div>';
+
+  const horizons = [
+    {key:"week", label:"This Week"},
+    {key:"month", label:"This Month"},
+    {key:"quarter", label:"3 Months"}
+  ];
+
+  horizons.forEach((h,i)=>{
+    const defaultOpen = (h.key==="week");
+    html += `<div style="margin-bottom:20px;">
+      <details ${defaultOpen?'open':''}>
+        <summary style="font-size:18px;font-weight:bold;cursor:pointer;">
+          ${h.label}
+        </summary>`;
+
+    domains.forEach(d=>{
+      const domainThreads = activeThreads.filter(t=>t.domain===d);
+      if(domainThreads.length===0) return;
+
+      html += `<div style="margin-left:15px;margin-top:10px;">
+        <strong>${d}</strong>
+        <ul style="margin-top:5px;">`;
+
+      domainThreads.forEach(t=>{
+        const stalled = daysSince(t.lastTouched)>14;
+        const dot = stalled ? "🟠" : "●";
+        html += `<li style="margin-bottom:4px;opacity:${stalled?0.6:1};">
+          ${dot} ${t.title||t.name}
+        </li>`;
+      });
+
+      html += '</ul></div>';
+    });
+
+    html += '</details></div>';
+  });
+
+  html += '</div>';
+
+  const completedWeek = (state.threads||[]).filter(t=>{
+    if(t.status!=="archived") return false;
+    return daysSince(t.lastTouched)<=7;
+  }).length;
+
+  const high = activeThreads.filter(t=>(t.urgency||'').toLowerCase()==='high').length;
+  const med = activeThreads.filter(t=>(t.urgency||'').toLowerCase()==='medium').length;
+  const low = activeThreads.filter(t=>(t.urgency||'').toLowerCase()==='low').length;
+
+  html += '<div style="flex:1;border-left:1px solid #333;padding-left:20px;">';
+  html += '<h3>Momentum</h3>';
+  html += `<div>Movement (7d): ${completedWeek}</div>`;
+  html += `<div>Intent → H:${high} M:${med} L:${low}</div>`;
+  html += '</div>';
+
+  html += '</div>';
+  root.innerHTML = html;
+}
