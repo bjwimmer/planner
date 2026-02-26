@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+  <meta http-equiv="Pragma" content="no-cache"/>
+  <meta http-equiv="Expires" content="0"/>
+  <title>Quick Capture · Planner</title>
+  <link rel="icon" href="favicon.ico"/>
+  <link rel="stylesheet" href="assets/style.css?v=53"/>
+</head>
+<body data-page="quick">
+  <div class="topbar">
+    <div class="container">
+      <div class="row" style="justify-content:space-between">
+        <div class="brand">
+          <span style="font-size:20px">⚡</span>
+          <span>Quick Capture</span>
+          <span class="badge" data-sync-indicator>• Not connected</span>
+          <span class="badge" data-build></span>
+        </div>
+        <div class="row" style="gap:8px">
+          <button class="btn" data-open-sync>Sync</button>
+          <button class="btn" data-export>Export</button>
+          <label class="btn" style="cursor:pointer">
+            Import <input type="file" accept="application/json" data-import style="display:none">
+          </label>
+        </div>
+      </div>
+      <div class="nav">
+        <a data-nav href="index.html">Map</a>
+        <a data-nav href="quick-capture.html">⚡ Quick Capture</a>
+        <a data-nav href="strategic-life-map.html">Strategic Life Map</a>
+        <a data-nav href="thread-registry.html">Thread Registry</a>
+        <a data-nav href="90-day-income-map.html">90‑Day Income Map</a>
+        <a data-nav href="how-this-works.html">How This Works</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="grid">
+      <div class="card">
+        <h2>Capture (no decisions)</h2>
+        <p class="kicker">One line is enough. This is an inbox, not a life verdict.</p>
+        <form id="captureForm">
+          <label>What's in your head?</label>
+          <input id="captureText" placeholder="Example: 'Call insurance about…' or 'Design idea: …'"/>
+          <div class="row" style="margin-top:10px">
+            <button class="btn primary" type="submit">Add to inbox</button>
+            <a class="btn" href="thread-registry.html">Go process → Registry</a>
+          </div>
+        </form>
+        <hr/>
+        <button class="btn warn" id="archiveAll">Archive all inbox items</button>
+      </div>
+      <div class="card">
+        <h2>Inbox</h2>
+        <div id="inboxList" class="list"></div>
+      </div>
+    </div>
+    <div class="footer" data-footer></div>
+  </div>
+
+  <div class="modal-backdrop" id="syncModalBackdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Sync Settings">
+      <div class="modal-header">
+        <div class="modal-title">Sync (GitHub Gist)</div>
+        <button class="btn" data-close-sync>Close</button>
+      </div>
+      <p class="kicker">Auto-pull on load is ON. Push is manual. Token stays on this device only.</p>
+      <label>Gist ID</label>
+      <input id="syncGistId" placeholder="paste the Gist ID from the URL"/>
+      <label>GitHub Token (gist read/write)</label>
+      <input id="syncToken" type="password" placeholder="paste token here"/>
+      <label style="display:flex;align-items:center;gap:10px;margin-top:10px">
+        <input id="syncAutoPull" type="checkbox" style="width:auto"> Enable auto-pull on page load
+      </label>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="syncSave">Save</button>
+        <button class="btn good" id="syncPull">Pull</button>
+        <button class="btn warn" id="syncForcePull">Force Pull</button>
+        <button class="btn primary" id="syncPush">Push</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn bad" id="syncClear">Clear sync settings (this device)</button>
+      </div>
+      <p class="small" id="syncStatus"></p>
+      <p class="small">Cloud file name: <span class="mono">planner-data.json</span></p>
+    </div>
+  </div>
+
+  <script src="assets/app.v53.js?v=53"></script>
+</body>
+</html>
