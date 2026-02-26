@@ -144,6 +144,23 @@ input::placeholder, textarea::placeholder{color:#94a3b8}
 .pill.good{border-color: rgba(5,150,105,.45)}
 .pill.warn{border-color: rgba(217,119,6,.45)}
 .pill.bad{border-color: rgba(225,29,72,.45)}
+
+/* Colorful domain pills - higher specificity */
+span.pill.domain-pill {
+  font-weight: 600;
+  font-size: 13px;
+  padding: 5px 12px;
+  border: none;
+  color: white;
+  background: rgb(100,116,139); /* default gray for Financial, Other, etc */
+}
+span.pill.domain-pill[data-domain*="health" i] { background: rgb(5,150,105) !important; }
+span.pill.domain-pill[data-domain*="home" i] { background: rgb(217,119,6) !important; }
+span.pill.domain-pill[data-domain*="income" i], 
+span.pill.domain-pill[data-domain*="work" i] { background: rgb(37,99,235) !important; }
+span.pill.domain-pill[data-domain*="relationship" i] { background: rgb(236,72,153) !important; }
+span.pill.domain-pill[data-domain*="creative" i], 
+span.pill.domain-pill[data-domain*="meaning" i] { background: rgb(124,58,237) !important; }
 .footer{
   margin:18px 0 10px;
   color:var(--muted);
@@ -286,6 +303,44 @@ html[data-color="plus"] .card::before{
   align-items:center;
   margin-bottom:10px;
 }
+
+/* Style domain section headers as colorful buttons - NOT goal titles */
+.domain-head strong {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 8px 16px;
+  border-radius: 12px;
+  display: inline-block;
+  text-transform: uppercase;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
+.domain-head.domain-health strong { 
+  background: rgb(5,150,105);
+  color: white;
+}
+.domain-head.domain-home strong { 
+  background: rgb(217,119,6);
+  color: white;
+}
+.domain-head.domain-work-income strong { 
+  background: rgb(37,99,235);
+  color: white;
+}
+.domain-head.domain-relationships strong { 
+  background: rgb(236,72,153);
+  color: white;
+}
+.domain-head.domain-creative-meaning strong { 
+  background: rgb(124,58,237);
+  color: white;
+}
+.domain-head.domain-other strong { 
+  background: rgb(100,116,139);
+  color: white;
+}
 .mini-input{
   width: 220px;
   max-width: 44vw;
@@ -309,6 +364,15 @@ html[data-color="plus"] .card::before{
   gap:10px;
   align-items:flex-start;
 }
+
+/* Subtle yellow highlight on goal titles */
+.goal-head strong {
+  background: rgba(254, 243, 199, 0.6); /* very light yellow */
+  padding: 4px 10px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
 .goal .meta{ margin-top:6px; gap:8px; flex-wrap:wrap; display:flex; }
 .goal-list{ display:flex; flex-direction:column; }
 
