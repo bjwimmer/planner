@@ -1025,7 +1025,7 @@ function initLifeMap(){
           <div>
             <strong>${escapeHtml(g.title||"")}</strong>
             <div class="meta">
-              <span class="pill">${escapeHtml(domain)}</span>
+              <span class="pill domain-pill" data-domain="${escapeAttr(domain.toLowerCase())}">${escapeHtml(domain)}</span>
             </div>
             ${threadLinksHtml(g)}
           </div>
