@@ -1506,3 +1506,23 @@ document.addEventListener("DOMContentLoaded", ()=>{
 document.addEventListener("DOMContentLoaded", ()=>{
   try{ const el = document.querySelector("[data-build]"); if(el) el.textContent = BUILD_VERSION; }catch(e){}
 });
+
+
+// ===== BUILD STAMP =====
+function injectBuildStamp() {
+  // Avoid duplicates
+  if (document.getElementById("build-stamp")) return;
+
+  const stamp = document.createElement("div");
+  stamp.id = "build-stamp";
+  stamp.textContent = "Build " + (typeof BUILD_VERSION !== "undefined" ? BUILD_VERSION : "");
+  document.body.appendChild(stamp);
+}
+
+// If DOMContentLoaded already fired (fast load / cache), inject immediately.
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", injectBuildStamp);
+} else {
+  injectBuildStamp();
+}
+
