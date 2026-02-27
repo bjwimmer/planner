@@ -992,10 +992,12 @@ function initLifeMap(){
     return `<div class="thread-links-row">${pills}</div>`;
   }
 
-  function attachThreadPickerHtml(g){
+  // FIX: Added domain parameter, default "— None —", filter threads by domain
+  function attachThreadPickerHtml(g, domain){
     const ids = new Set(Array.isArray(g.linkedThreadIds) ? g.linkedThreadIds.map(String) : []);
+    const domainNorm = (domain||"").trim().toLowerCase();
     const options = st.threads
-      .filter(t=>t.status!=="archived" && !ids.has(String(t.id)))
+      .filter(t=>t.status!=="archived" && !ids.has(String(t.id)) && (domainNorm ? (t.domain||"").trim().toLowerCase()===domainNorm : true))
       .map(t=>`<option value="${escapeAttr(String(t.id))}">${escapeHtml(t.title)}</option>`)
       .join("");
     if(!options) return '';
@@ -1003,7 +1005,10 @@ function initLifeMap(){
       <div style="margin-top:8px">
         <label class="small">Attach existing thread</label>
         <div class="row" style="gap:8px">
-          <select data-attach-thread-select="${escapeAttr(g.id)}">${options}</select>
+          <select data-attach-thread-select="${escapeAttr(g.id)}">
+            <option value="">— None —</option>
+            ${options}
+          </select>
           <button class="btn" type="button" data-attach-thread="${escapeAttr(g.id)}">Attach</button>
         </div>
       </div>
@@ -1013,7 +1018,6 @@ function initLifeMap(){
   function goalRow(hKey, domain, g){
     const dClass  = domainClass(domain);
     const urgency = g.urgency || st.lifeMap.defaultUrgency || "medium";
-    // ⬅ = more urgent = promote toward "week". ➡ = less urgent = demote toward "quarter".
     const leftLabel  = hKey==="month"   ? "← Week"    : "← Month";
     const rightLabel = hKey==="week"    ? "Month →"   : "Quarter →";
     const leftBtn  = (hKey!=="week")    ? `<button class="btn arrow-btn" data-promote="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}" title="Move to more urgent horizon">${leftLabel}</button>`  : `<span></span>`;
@@ -1050,7 +1054,7 @@ function initLifeMap(){
             <button class="btn primary" data-save-goal="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">Save</button>
             <div style="height:8px"></div>
             <button class="btn good"    data-thread-from-goal="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">🧵 Create Thread</button>
-            ${attachThreadPickerHtml(g)}
+            ${attachThreadPickerHtml(g, domain)}
             <div style="height:8px"></div>
             <button class="btn bad"     data-delete-goal="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">Delete</button>
           </div>
@@ -1189,7 +1193,6 @@ function initLifeMap(){
         st.threads.unshift(thread);
         g.linkedThreadIds = Array.isArray(g.linkedThreadIds) ? g.linkedThreadIds : [];
         g.linkedThreadIds.unshift(thread.id);
-        // Deduplicate
         g.linkedThreadIds = [...new Set(g.linkedThreadIds.map(String))];
         g.updatedAt = now;
         saveState(st);
@@ -1224,7 +1227,6 @@ function initLifeMap(){
         g.linkedThreadIds = Array.isArray(g.linkedThreadIds) ? g.linkedThreadIds : [];
         if(!g.linkedThreadIds.map(String).includes(String(tid))){
           g.linkedThreadIds.unshift(tid);
-          // Deduplicate
           g.linkedThreadIds = [...new Set(g.linkedThreadIds.map(String))];
           g.updatedAt = nowIso();
           saveState(st); renderFooter(st); render();
@@ -1301,7 +1303,7 @@ function initIncomeMap(){
           notes: `Created from Income Map checkpoint (Week ${wk}).\n\n${cp.detail}`,
           createdAt: now, updatedAt: now,
         });
-        saveState(st);  // FIX: was saveState() — missing st argument
+        saveState(st);
         toast("Thread created in Thread Registry (domain: Income).");
       });
     });
