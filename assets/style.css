@@ -141,32 +141,34 @@ input::placeholder, textarea::placeholder{color:#94a3b8}
 .item strong{display:block; margin-bottom:4px}
 .item .meta{display:flex; gap:10px; flex-wrap:wrap; color:var(--muted); font-size:12px}
 .pill{padding:3px 8px; border-radius:999px; border:1px solid rgba(215,222,233,.95); background:rgba(255,255,255,.96)}
-.pill.good{border-color: rgba(5,150,105,.45)}
-.pill.warn{border-color: rgba(217,119,6,.45)}
-.pill.bad{border-color: rgba(225,29,72,.45)}
+.pill.good{ background: rgba(5,150,105,.15); border-color: rgba(5,150,105,.45); color: #065f46; font-weight: 700; }
+.pill.warn{ background: rgba(217,119,6,.18); border-color: rgba(217,119,6,.55); color: #92400e; font-weight: 700; }
+.pill.bad{  border-color: rgba(225,29,72,.45); }
 
-/* Colorful domain pills - higher specificity */
+/* Colorful domain pills */
 span.pill.domain-pill {
   font-weight: 600;
   font-size: 13px;
   padding: 5px 12px;
   border: none;
   color: white;
-  background: rgb(100,116,139); /* default gray for Financial, Other, etc */
+  background: rgb(100,116,139);
 }
 span.pill.domain-pill[data-domain*="health" i] { background: rgb(5,150,105) !important; }
 span.pill.domain-pill[data-domain*="home" i] { background: rgb(217,119,6) !important; }
-span.pill.domain-pill[data-domain*="income" i], 
+span.pill.domain-pill[data-domain*="income" i],
 span.pill.domain-pill[data-domain*="work" i] { background: rgb(37,99,235) !important; }
 span.pill.domain-pill[data-domain*="relationship" i] { background: rgb(236,72,153) !important; }
-span.pill.domain-pill[data-domain*="creative" i], 
+span.pill.domain-pill[data-domain*="creative" i],
 span.pill.domain-pill[data-domain*="meaning" i] { background: rgb(124,58,237) !important; }
+
 .footer{
   margin:18px 0 10px;
   color:var(--muted);
   font-size:12px;
   display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;
 }
+
 /* Domain coloring */
 .domain-strip{
   position:absolute;
@@ -187,6 +189,7 @@ span.pill.domain-pill[data-domain*="meaning" i] { background: rgb(124,58,237) !i
 .domain-relationships{ background: linear-gradient(180deg, rgba(253,242,248,.92), rgba(255,255,255,.94)); }
 .domain-creative-meaning{ background: linear-gradient(180deg, rgba(245,243,255,.92), rgba(255,255,255,.94)); }
 .domain-other{ background: linear-gradient(180deg, rgba(248,250,252,.92), rgba(255,255,255,.94)); }
+
 /* Page themes */
 body[data-page="quick"] .topbar{ background: rgba(255,247,237,.88); }
 body[data-page="registry"] .topbar{ background: rgba(240,253,250,.88); }
@@ -194,6 +197,7 @@ body[data-page="lifemap"] .topbar{ background: rgba(245,243,255,.88); }
 body[data-page="income"] .topbar{ background: rgba(239,246,255,.88); }
 body[data-page="home"] .topbar{ background: rgba(246,248,252,.88); }
 body[data-page="how"] .topbar{ background: rgba(248,250,252,.88); }
+
 /* Modal */
 .modal-backdrop{
   position:fixed; inset:0;
@@ -215,21 +219,17 @@ body[data-page="how"] .topbar{ background: rgba(248,250,252,.88); }
 .modal-header{display:flex; justify-content:space-between; align-items:center; gap:10px}
 .modal-title{ font-size:20px; font-weight:800; }
 
-
-/* Nav color hints (professional) */
+/* Nav color hints */
 .nav a[data-nav][href="quick-capture.html"]{ border-color: rgba(217,119,6,.35); }
 .nav a[data-nav][href="quick-capture.html"].active{ background: rgba(217,119,6,.12); border-color: rgba(217,119,6,.55); box-shadow: 0 0 0 3px rgba(217,119,6,.10) inset, 0 12px 22px rgba(217,119,6,.12); }
-
 .nav a[data-nav][href="thread-registry.html"]{ border-color: rgba(5,150,105,.30); }
 .nav a[data-nav][href="thread-registry.html"].active{ background: rgba(5,150,105,.10); border-color: rgba(5,150,105,.50); box-shadow: 0 0 0 3px rgba(5,150,105,.10) inset, 0 12px 22px rgba(5,150,105,.12); }
-
 .nav a[data-nav][href="strategic-life-map.html"]{ border-color: rgba(124,58,237,.30); }
 .nav a[data-nav][href="strategic-life-map.html"].active{ background: rgba(124,58,237,.10); border-color: rgba(124,58,237,.50); box-shadow: 0 0 0 3px rgba(124,58,237,.10) inset, 0 12px 22px rgba(124,58,237,.12); }
-
 .nav a[data-nav][href="income-map.html"]{ border-color: rgba(37,99,235,.30); }
 .nav a[data-nav][href="income-map.html"].active{ background: rgba(37,99,235,.10); border-color: rgba(37,99,235,.55); }
 
-/* Dopamine mode: same structure, higher color energy (toggleable) */
+/* Dopamine mode */
 body.dopamine{
   background:
     radial-gradient(1100px 700px at 10% 6%, rgba(37,99,235,.18), transparent 55%),
@@ -247,10 +247,8 @@ body.dopamine .card::before{
   );
 }
 
-/* Color+ mode (slightly more saturated, still professional) */
-html[data-color="plus"]{
-  --shadow: 0 12px 30px rgba(15,23,42,.12);
-}
+/* Color+ mode */
+html[data-color="plus"]{ --shadow: 0 12px 30px rgba(15,23,42,.12); }
 html[data-color="plus"] body{
   background:
     radial-gradient(1100px 600px at 10% 6%, rgba(37,99,235,.18), transparent 55%),
@@ -267,16 +265,23 @@ html[data-color="plus"] .card::before{
   );
 }
 
-
-/* --- Strategic Life Map (v11) --- */
+/* --- Strategic Life Map --- */
 .horizon-grid{
   display:grid;
-  grid-template-columns: 1fr 1fr 1.2fr; /* 3 Months a bit wider */
+  grid-template-columns: repeat(3, minmax(320px, 1fr));
   gap:16px;
   align-items:start;
 }
+@media (max-width: 1100px){
+  .horizon-grid{
+    grid-template-columns: repeat(3, minmax(300px, 1fr));
+    overflow-x:auto;
+    padding-bottom: 6px;
+  }
+  .horizon-grid::-webkit-scrollbar{ height:10px; }
+}
 @media (max-width: 980px){
-  .horizon-grid{ grid-template-columns: 1fr; }
+  .horizon-grid{ grid-template-columns: 1fr; overflow-x:visible; }
 }
 .hcol{
   background: rgba(255,255,255,.86);
@@ -302,45 +307,42 @@ html[data-color="plus"] .card::before{
   gap:10px;
   align-items:center;
   margin-bottom:10px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.domain-head > .row{
+  flex-wrap: wrap;
+  width: 100%;
+  justify-content: flex-start;
+}
+.domain-head .mini-input{
+  flex: 1 1 220px;
+  width: auto;
+  max-width: 100%;
+}
+.domain-head .btn{
+  white-space: nowrap;
 }
 
-/* Style domain section headers as colorful buttons - NOT goal titles */
+/* Domain section header labels — FIX: selector is on .domain-block, not .domain-head */
 .domain-head strong {
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.3px;
+  letter-spacing: 1px;
   padding: 8px 16px;
   border-radius: 12px;
   display: inline-block;
   text-transform: uppercase;
-  font-size: 14px;
-  letter-spacing: 1px;
-}
-
-.domain-head.domain-health strong { 
-  background: rgb(5,150,105);
-  color: white;
-}
-.domain-head.domain-home strong { 
-  background: rgb(217,119,6);
-  color: white;
-}
-.domain-head.domain-work-income strong { 
-  background: rgb(37,99,235);
-  color: white;
-}
-.domain-head.domain-relationships strong { 
-  background: rgb(236,72,153);
-  color: white;
-}
-.domain-head.domain-creative-meaning strong { 
-  background: rgb(124,58,237);
-  color: white;
-}
-.domain-head.domain-other strong { 
   background: rgb(100,116,139);
   color: white;
 }
+.domain-health .domain-head strong    { background: rgb(5,150,105);   color: white; }
+.domain-home .domain-head strong      { background: rgb(217,119,6);   color: white; }
+.domain-work-income .domain-head strong { background: rgb(37,99,235); color: white; }
+.domain-relationships .domain-head strong { background: rgb(236,72,153); color: white; }
+.domain-creative-meaning .domain-head strong { background: rgb(124,58,237); color: white; }
+.domain-other .domain-head strong     { background: rgb(100,116,139); color: white; }
+
 .mini-input{
   width: 220px;
   max-width: 44vw;
@@ -367,7 +369,7 @@ html[data-color="plus"] .card::before{
 
 /* Subtle yellow highlight on goal titles */
 .goal-head strong {
-  background: rgba(254, 243, 199, 0.6); /* very light yellow */
+  background: rgba(254, 243, 199, 0.6);
   padding: 4px 10px;
   border-radius: 6px;
   display: inline-block;
@@ -375,53 +377,8 @@ html[data-color="plus"] .card::before{
 
 .goal .meta{ margin-top:6px; gap:8px; flex-wrap:wrap; display:flex; }
 .goal-list{ display:flex; flex-direction:column; }
-
-
-/* --- Life Map layout fixes (v18) --- */
-.horizon-grid{
-  grid-template-columns: repeat(3, minmax(320px, 1fr));
-}
-@media (max-width: 1100px){
-  .horizon-grid{
-    grid-template-columns: repeat(3, minmax(300px, 1fr));
-    overflow-x:auto;
-    padding-bottom: 6px;
-  }
-  .horizon-grid::-webkit-scrollbar{ height:10px; }
-}
-@media (max-width: 980px){
-  .horizon-grid{ grid-template-columns: 1fr; overflow-x:visible; }
-}
-.domain-head{
-  flex-wrap: wrap;
-  align-items: flex-start;
-}
-.domain-head > .row{
-  flex-wrap: wrap;
-  width: 100%;
-  justify-content: flex-start;
-}
-.domain-head .mini-input{
-  flex: 1 1 220px;
-  width: auto;
-  max-width: 100%;
-}
-.domain-head .btn{
-  white-space: nowrap;
-}
-.goal-card{
-  overflow-wrap: anywhere;
-}
-.goal-card .row{
-  flex-wrap: wrap;
-}
-
-
-
-/* planner-test ribbon */
-@media (prefers-color-scheme: light){
-  }
-
+.goal-card{ overflow-wrap: anywhere; }
+.goal-card .row{ flex-wrap: wrap; }
 
 /* Income Map small action button */
 .btn.mini{padding:6px 10px; font-size:12px; line-height:1.1;}
@@ -449,7 +406,19 @@ html[data-color="plus"] .card::before{
   font-weight:700;
 }
 
-/* --- Morning Map (Phase 1/2) --- */
+/* === Arrow buttons (Life Map horizon move) === */
+.arrow-btn {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 10px;
+  white-space: nowrap;
+  letter-spacing: .2px;
+  border-radius: 10px;
+  line-height: 1.2;
+  min-width: 72px;
+}
+
+/* --- Morning Map --- */
 .hero .h1{font-size:22px;font-weight:800;margin:0;}
 .hero .muted{margin-top:4px;}
 .grid2{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;align-items:start;}
@@ -492,34 +461,11 @@ html[data-color="plus"] .card::before{
 .popoverText{white-space:pre-wrap;line-height:1.35;margin-bottom:12px;}
 
 /* Home quick links */
-.quicklinks{ display:flex; flex-wrap:wrap; gap:10px; }
-.qlbtn{
-  display:inline-flex; align-items:center; justify-content:center;
-  padding:12px 14px; border-radius:14px;
-  border:1px solid rgba(0,0,0,.12);
-  background: rgba(255,255,255,.8);
-  text-decoration:none; color: inherit;
-  font-weight: 600;
-}
-.qlbtn:hover{ box-shadow: 0 10px 24px rgba(0,0,0,.08); transform: translateY(-1px); }
-
-
-/* === TEST Debug Panel === */
-#debugPanel{position:fixed;right:12px;bottom:12px;z-index:9999;background:rgba(20,20,20,.92);color:#fff;border:1px solid rgba(255,255,255,.12);border-radius:12px;min-width:260px;max-width:360px;font-size:12px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
-#debugPanel .dbg-head{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12)}
-#debugPanel .dbg-body{padding:8px 10px;line-height:1.4}
-#debugPanel .dbg-k{opacity:.75}
-#debugPanel .dbg-btn{background:transparent;border:0;color:#fff;cursor:pointer;font-size:14px;line-height:1}
-
-
-/* Home quick links */
 .quicklinksCard{margin:14px 0;}
 .quicklinksGrid{display:flex;flex-wrap:wrap;gap:10px;}
-.btn.big{padding:12px 14px;border-radius:14px;}
-.btn.big{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;}
+.btn.big{padding:12px 14px;border-radius:14px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;}
 
-
-/* North Star (Orientation Layer) */
+/* North Star */
 .northStarCard{
   background:#ffffff;
   border:1px solid rgba(0,0,0,.08);
@@ -555,19 +501,7 @@ html[data-color="plus"] .card::before{
 }
 .spacer{height:14px;}
 
-/* === Arrow buttons (Life Map horizon move) === */
-.arrow-btn {
-  font-size: 12px;
-  font-weight: 700;
-  padding: 6px 10px;
-  white-space: nowrap;
-  letter-spacing: .2px;
-  border-radius: 10px;
-  line-height: 1.2;
-  min-width: 72px;
-}
-
-/* === Thread link pills with status badge (Life Map) === */
+/* === Thread link pills === */
 .thread-links-row {
   display: flex;
   flex-wrap: wrap;
@@ -612,14 +546,24 @@ html[data-color="plus"] .card::before{
 .tls-done    { background: rgba(5,150,105,.14);  color: #065f46; border: 1px solid rgba(5,150,105,.35); }
 .tls-idle    { background: rgba(148,163,184,.18);color: #475569; border: 1px solid rgba(148,163,184,.40); }
 
+/* === Test ribbon === */
+#debugPanel{position:fixed;right:12px;bottom:12px;z-index:9999;background:rgba(20,20,20,.92);color:#fff;border:1px solid rgba(255,255,255,.12);border-radius:12px;min-width:260px;max-width:360px;font-size:12px;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+#debugPanel .dbg-head{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.12)}
+#debugPanel .dbg-body{padding:8px 10px;line-height:1.4}
+#debugPanel .dbg-k{opacity:.75}
+#debugPanel .dbg-btn{background:transparent;border:0;color:#fff;cursor:pointer;font-size:14px;line-height:1}
 
-/* 2-COLUMN THREAD LAYOUT */
+/* 3-COLUMN THREAD LAYOUT */
 #threadsList.list {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 1.5rem;
 }
-
+@media (max-width: 1100px) {
+  #threadsList.list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
 @media (max-width: 968px) {
   #threadsList.list {
     grid-template-columns: 1fr;

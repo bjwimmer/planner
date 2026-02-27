@@ -53,8 +53,8 @@ function esc(s){ return escHtml(s); }
 const NAV_ITEMS = [
   { href: "index.html", label: "Map" },
   { href: "quick-capture.html", label: "⚡ Quick Capture" },
-  { href: "strategic-life-map.html", label: "Strategic Life Map" },
   { href: "thread-registry.html", label: "Thread Registry" },
+  { href: "strategic-life-map.html", label: "Strategic Life Map" },
   { href: "90-day-income-map.html", label: "90‑Day Income Map" },
   { href: "how-this-works.html", label: "How This Works" },
 ];
@@ -768,7 +768,8 @@ function initThreadRegistry(){
 
     threadsEl.innerHTML = activeThreads.length ? activeThreads.map(t=>{
       const inSlot = (String(st.weekly.slot1)===String(t.id) || String(st.weekly.slot2)===String(t.id));
-      const pill = inSlot ? `<span class="pill good">Active this week</span>` : `<span class="pill">Backlog</span>`;
+      const domainPillColor = t.domain ? ` domain-pill" data-domain="${escapeAttr((t.domain||"").toLowerCase())}` : ``;
+      const pill = inSlot ? `<span class="pill good">Active this week</span>` : `<span class="pill warn">⏳ Unscheduled</span>`;
       const links = threadBacklinks(t.id);
       const backlinksHtml = links.length ? `<div class="meta" style="margin-top:6px; flex-wrap:wrap; gap:6px; display:flex">
         <span class="small" style="color:var(--muted); align-self:center">📍 Goals:</span>
@@ -781,7 +782,7 @@ function initThreadRegistry(){
           <strong>${escapeHtml(t.title)}</strong>
           <div class="meta">
             ${pill}
-            ${t.domain ? `<span class="pill">${escapeHtml(t.domain)}</span>` : ""}
+            ${t.domain ? `<span class="pill domain-pill" data-domain="${escapeAttr((t.domain||"").toLowerCase())}">${escapeHtml(t.domain)}</span>` : ""}
             <span class="mono">Updated: ${new Date(t.updatedAt).toLocaleString()}</span>
           </div>
           ${backlinksHtml}
