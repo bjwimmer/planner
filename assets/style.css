@@ -46,7 +46,7 @@ code{font-family:var(--mono); color:#3730a3}
   background:rgba(255,255,255,.80);
   box-shadow: 0 6px 14px rgba(15,23,42,.06);
 }
-.nav{display:flex; flex-wrap:wrap; gap:10px; margin-top:12px}
+.nav{display:flex; flex-wrap:nowrap; gap:10px; margin-top:12px; overflow-x:auto; padding-bottom:2px}
 .nav a{
   font-size:13px;
   padding:9px 12px;
@@ -55,6 +55,8 @@ code{font-family:var(--mono); color:#3730a3}
   border-radius:999px;
   box-shadow: 0 6px 14px rgba(15,23,42,.06);
   transition: transform .12s ease, box-shadow .12s ease, background .12s ease, border-color .12s ease;
+  white-space: nowrap;
+  text-align: center;
 }
 .nav a:hover{transform: translateY(-1px); box-shadow: 0 12px 22px rgba(15,23,42,.10); border-color: rgba(37,99,235,.40)}
 .nav a.active{
@@ -380,6 +382,11 @@ html[data-color="plus"] .card::before{
   box-shadow: 0 10px 22px rgba(15,23,42,.08);
   margin-bottom:10px;
 }
+/* Goal strip — wider and lighter than domain strip */
+.goal .domain-strip{
+  width: 15px;
+  opacity: .55;
+}
 .goal-head{
   display:flex;
   justify-content:space-between;
@@ -389,10 +396,14 @@ html[data-color="plus"] .card::before{
 
 /* Subtle yellow highlight on goal titles */
 .goal-head strong {
-  background: rgba(254, 243, 199, 0.6);
-  padding: 4px 10px;
+  background: rgba(254, 243, 199, 0.85);
+  padding: 5px 12px;
   border-radius: 6px;
   display: inline-block;
+  font-size: 16px;
+  font-weight: 800;
+  color: #1e3a8a;
+  border-left: 3px solid rgba(217,119,6,.70);
 }
 
 .goal .meta{ margin-top:6px; gap:8px; flex-wrap:wrap; display:flex; }

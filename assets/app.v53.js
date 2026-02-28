@@ -1,7 +1,7 @@
 const BUILD_VERSION = "v53";
 const DEFAULT_ORIENTATION_TEXT = "Planner Orientation Layer — Implementation Blueprint v1.0\n\nThis document defines the calm, structured, orientation-first homepage layer for the existing planner system. It is an additive front-layer, not a rebuild. All existing planner pages and logic remain intact.\n\nCore Design Intent\n\nTone: Relaxed, creative, open.\nEmotional Effect: Structured stillness.\nFunction: Orientation before execution.\nRule: One continuous vertical layout. No collapsible sections above the fold.\n\nHomepage Structure (Top to Bottom)\n\n1. NORTH STAR (Locked Section)\n\nAnchoring Sentence (locked, editable only during scheduled review):\n\n\"I finish my life in peace — no debt left behind, no burden passed forward, living comfortably enough to create and care for myself.\"\n\nPractical Bullet Conditions (locked):\n\n• No consumer debt.\n\n• Housing path resolved and documented.\n\n• Home simplified and document-ready.\n\n• Income baseline stable with protected creative time.\n\n2. 90-DAY GATE (Current Season)\n\nHeader format: By [Insert Date]\n\n• Housing decision path chosen.\n\n• Debt strategy documented and active.\n\n• Minimum viable home clear established.\n\n3. THIS WEEK (Maximum 3 Commitments)\n\nOnly 1–3 commitments allowed. Each must have a clear 'done' definition.\n\nExample placeholders:\n\n• [Commitment 1]\n\n• [Commitment 2]\n\n• [Commitment 3]\n\n4. TODAY (One Lever Only)\n\nSingle action that advances one weekly commitment. No additional task lists visible on homepage.\n\nNavigation Rules\n\nAll deeper planner pages remain intact.\nA simple 'Home' link is added to each deeper page.\nHomepage remains the browser default start page.\nNo metrics, widgets, progress bars, or dashboards added.\n\nVisual Tone Guidelines\n\nBackground: Warm cream or soft neutral.\nText: Dark slate or charcoal (not pure black).\nAccent hierarchy:\n• Deep muted teal for North Star.\n• Warm clay/amber for 90-Day Gate.\n• Soft sage or gray-blue for Weekly.\n• Subtle highlight for Today.\nTypography: Soft serif for headings; clean sans-serif for body.\n\nGuardrails\n\n• Homepage must fit on one screen without scrolling.\n• North Star text remains locked except during scheduled review.\n• No new sections added without revisiting structure intentionally.\n• This page serves orientation, not tracking.";
 
-const DEFAULT_DOMAINS = ["Work","Income","Financial","Home","Health"];
+const DEFAULT_DOMAINS = ["Work","Income","Financial","Home","Health","Personal"];
 
 /* === planner-test safeguards === */
 const APP_FLAVOR = "planner-test";
@@ -567,6 +567,7 @@ function domainClass(domainRaw){
   if(d.includes("work") || d.includes("job") || d.includes("career") || d.includes("employ")) return "domain-work";
   if(d.includes("income") || d.includes("money") || d.includes("revenue") || d.includes("earn")) return "domain-income";
   if(d.includes("creative") || d.includes("meaning") || d.includes("writing") || d.includes("art")) return "domain-creative-meaning";
+  if(d.includes("personal") || d.includes("self")) return "domain-personal";
   return "domain-other";
 }
 
@@ -794,13 +795,13 @@ function initThreadRegistry(){
             <span class="mono">Updated: ${new Date(t.updatedAt).toLocaleString()}</span>
           </div>
           ${backlinksHtml}
-          <div class="grid" style="margin-top:10px">
+          <div class="grid" style="margin-top:10px; align-items:flex-start; grid-template-columns: 1fr auto">
             <div>
               <label>Next micro-action (5–20 min)</label>
-              <input value="${escapeHtml(t.nextAction || "")}" data-next="${t.id}" placeholder="Example: Open file and write 5 bullets"/>
+              <textarea data-next="${t.id}" placeholder="Example: Open file and write 5 bullets" rows="2" style="min-height:60px;resize:vertical">${escapeHtml(t.nextAction || "")}</textarea>
             </div>
             <div>
-              <label>Status</label>
+              <label style="min-height:36px; display:flex; align-items:flex-start">Status</label>
               <select data-status="${t.id}">
                 <option value="active"   ${t.status==="active"  ?"selected":""}>active</option>
                 <option value="paused"   ${t.status==="paused"  ?"selected":""}>paused</option>
@@ -1114,11 +1115,12 @@ function initLifeMap(){
         <div class="domain-strip"></div>
         <div class="goal-head">
           <div>
-            <strong>${escapeHtml(g.title||"")}</strong>
+            <strong><span style="font-size:11px; font-weight:700; color:#92400e; letter-spacing:.6px; margin-right:6px">GOAL:</span>${escapeHtml(g.title||"")}</strong>
             <div class="meta">
               <span class="pill domain-pill" data-domain="${escapeAttr(domain.toLowerCase())}">${escapeHtml(domain)}</span>
             </div>
             ${threadLinksHtml(g)}
+            ${(()=>{ const linked = (g.linkedThreadIds||[]).map(id=>st.threads.find(t=>t.id===id)).filter(Boolean); const actions = linked.map(t=>t.nextAction).filter(Boolean); return actions.length ? `<div style="margin-top:8px; padding:8px 10px; background:rgba(239,246,255,.85); border-left:4px solid rgba(37,99,235,.60); border-radius:0 8px 8px 0"><div style="font-size:11px; font-weight:700; color:#1e40af; letter-spacing:.8px; margin-bottom:3px"><span style="color:#f59e0b">⚡</span> NEXT ACTION <span style="color:#f59e0b">⚡</span></div><div style="font-size:14px; font-weight:700; color:#1e3a8a">${escapeHtml(actions[0])}</div></div>` : ""; })()}
           </div>
           <div class="row" style="justify-content:flex-end; gap:8px">
             ${leftBtn}
@@ -1411,8 +1413,9 @@ function initIncomeMap(){
 // =============================================================
 function initMorningMap(){
   dbgMarkInit('morningMap');
-  const container = document.querySelector('.container');
+  const container = document.getElementById('mainContent') || document.querySelectorAll('.container')[1];
   if(!container) return;
+  initCommon();
   const st = loadState();
   ensureLifeMapSchema(st);
 
@@ -1423,13 +1426,8 @@ function initMorningMap(){
   if(!st.meta.ignitionIntent)    st.meta.ignitionIntent    = '';
   if(!st.meta.ignitionFirstMove) st.meta.ignitionFirstMove = '';
   if(!st.meta.ignitionTimebox)   st.meta.ignitionTimebox   = '10';
-  if(!st.meta.mvdThreadId)       st.meta.mvdThreadId       = '';
+  if(!st.meta.mvtThreadId)       st.meta.mvtThreadId       = '';
   if(!st.meta.sparkNotes)        st.meta.sparkNotes        = '';
-
-  setSyncIndicator();
-  wireModal();
-  autoPullIfEnabled();
-  renderFooter(st);
 
   const threads = (st.threads || []).filter(t=>t.status!=="archived");
   const threadOptions = ['<option value="">—</option>'].concat(
@@ -1437,23 +1435,7 @@ function initMorningMap(){
   ).join('');
 
   container.innerHTML = `
-    <div class="card hero">
-      <div class="h1">Morning Map</div>
-      <div class="muted">Orientation first. Execution second.</div>
-    </div>
 
-    <div class="quicklinksCard card">
-      <div class="cardHeader">
-        <div class="h2">Quick links</div>
-      </div>
-      <div class="quicklinksGrid">
-        <a class="btn big" href="quick-capture.html">⚡ Quick Capture</a>
-        <a class="btn big" href="thread-registry.html">Thread Registry</a>
-        <a class="btn big" href="strategic-life-map.html">Strategic Life Map</a>
-        <a class="btn big" href="90-day-income-map.html">90‑Day Income Map</a>
-        <a class="btn big" href="how-this-works.html">How This Works</a>
-      </div>
-    </div>
 
     <div class="grid2">
       <div class="card">
@@ -1510,12 +1492,12 @@ function initMorningMap(){
         </div>
 
         <div class="card">
-          <div class="h2">MVD for today</div>
+          <div class="h2">MVT: Most Valuable Task</div>
           <div class="field">
-            <label>Today's MVD thread</label>
-            <select id="mvdThread">${threadOptions}</select>
+            <label>Today's MVT</label>
+            <select id="mvtThread">${threadOptions}</select>
           </div>
-          <div class="row"><button class="btn primary" id="mvdSave">Save</button></div>
+          <div class="row"><button class="btn primary" id="mvtSave">Save</button></div>
         </div>
 
         <div class="card">
@@ -1536,10 +1518,10 @@ function initMorningMap(){
   // Set dropdown values
   const slot1El = document.getElementById('slot1');
   const slot2El = document.getElementById('slot2');
-  const mvdEl   = document.getElementById('mvdThread');
+  const mvdEl   = document.getElementById('mvtThread');
   if(slot1El) slot1El.value = st.weeklySlots?.slot1 || '';
   if(slot2El) slot2El.value = st.weeklySlots?.slot2 || '';
-  if(mvdEl)   mvdEl.value   = st.meta.mvdThreadId   || '';
+  if(mvdEl)   mvdEl.value   = st.meta.mvtThreadId   || '';
 
   const updatePreview = ()=>{
     const first = (document.getElementById('nsText')?.value||'').split('\n').find(l=>l.trim())||'';
@@ -1565,7 +1547,7 @@ function initMorningMap(){
     st.meta.ignitionTimebox   = document.getElementById('igTimebox').value;
     saveState(st); toast('Saved');
   });
-  document.getElementById('mvdSave')?.addEventListener('click',()=>{ st.meta.mvdThreadId = document.getElementById('mvdThread').value; saveState(st); toast('Saved'); });
+  document.getElementById('mvtSave')?.addEventListener('click',()=>{ st.meta.mvtThreadId = document.getElementById('mvtThread').value; saveState(st); toast('Saved'); });
 }
 
 // =============================================================
