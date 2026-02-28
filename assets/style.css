@@ -159,6 +159,7 @@ span.pill.domain-pill[data-domain*="home" i]         { background: rgb(217,119,6
 span.pill.domain-pill[data-domain*="work" i]         { background: rgb(37,99,235) !important; }
 span.pill.domain-pill[data-domain*="income" i]       { background: rgb(6,182,212) !important; }
 span.pill.domain-pill[data-domain*="financial" i]    { background: rgb(100,116,139) !important; }
+span.pill.domain-pill[data-domain*="personal" i]     { background: rgb(219,39,119) !important; }
 span.pill.domain-pill[data-domain*="creative" i],
 span.pill.domain-pill[data-domain*="meaning" i]      { background: rgb(236,72,153) !important; }
 
@@ -193,6 +194,9 @@ span.pill.domain-pill[data-domain*="meaning" i]      { background: rgb(236,72,15
 .domain-home .domain-strip          { background: rgba(217,119,6,.70); }
 .domain-home                        { background: linear-gradient(180deg, rgba(255,251,235,.92), rgba(255,255,255,.94)); }
 /* Creative — pink */
+/* Personal — fuchsia */
+.domain-personal .domain-strip          { background: rgba(219,39,119,.65); }
+.domain-personal                        { background: linear-gradient(180deg, rgba(253,242,248,.92), rgba(255,255,255,.94)); }
 .domain-creative-meaning .domain-strip { background: rgba(236,72,153,.65); }
 .domain-creative-meaning            { background: linear-gradient(180deg, rgba(253,242,248,.92), rgba(255,255,255,.94)); }
 /* Fallbacks */
@@ -217,7 +221,8 @@ span.pill.domain-pill[data-domain*="meaning" i]      { background: rgb(236,72,15
 }
 .domain-work .domain-head strong         { background: rgb(37,99,235);   color: white; }
 .domain-income .domain-head strong       { background: rgb(6,182,212);   color: white; }
-.domain-financial .domain-head strong    { background: rgb(124,58,237);  color: white; }
+.domain-financial .domain-head strong    { background: rgb(100,116,139);  color: white; }
+.domain-personal .domain-head strong     { background: rgb(219,39,119);  color: white; }
 .domain-health .domain-head strong       { background: rgb(5,150,105);   color: white; }
 .domain-home .domain-head strong         { background: rgb(217,119,6);   color: white; }
 .domain-creative-meaning .domain-head strong { background: rgb(236,72,153); color: white; }
