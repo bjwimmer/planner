@@ -158,7 +158,7 @@ span.pill.domain-pill[data-domain*="health" i]       { background: rgb(5,150,105
 span.pill.domain-pill[data-domain*="home" i]         { background: rgb(217,119,6) !important; }
 span.pill.domain-pill[data-domain*="work" i]         { background: rgb(37,99,235) !important; }
 span.pill.domain-pill[data-domain*="income" i]       { background: rgb(6,182,212) !important; }
-span.pill.domain-pill[data-domain*="financial" i]    { background: rgb(124,58,237) !important; }
+span.pill.domain-pill[data-domain*="financial" i]    { background: rgb(100,116,139) !important; }
 span.pill.domain-pill[data-domain*="creative" i],
 span.pill.domain-pill[data-domain*="meaning" i]      { background: rgb(236,72,153) !important; }
 
