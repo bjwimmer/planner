@@ -1,7 +1,7 @@
 const BUILD_VERSION = "v53";
 const DEFAULT_ORIENTATION_TEXT = "Planner Orientation Layer — Implementation Blueprint v1.0\n\nThis document defines the calm, structured, orientation-first homepage layer for the existing planner system. It is an additive front-layer, not a rebuild. All existing planner pages and logic remain intact.\n\nCore Design Intent\n\nTone: Relaxed, creative, open.\nEmotional Effect: Structured stillness.\nFunction: Orientation before execution.\nRule: One continuous vertical layout. No collapsible sections above the fold.\n\nHomepage Structure (Top to Bottom)\n\n1. NORTH STAR (Locked Section)\n\nAnchoring Sentence (locked, editable only during scheduled review):\n\n\"I finish my life in peace — no debt left behind, no burden passed forward, living comfortably enough to create and care for myself.\"\n\nPractical Bullet Conditions (locked):\n\n• No consumer debt.\n\n• Housing path resolved and documented.\n\n• Home simplified and document-ready.\n\n• Income baseline stable with protected creative time.\n\n2. 90-DAY GATE (Current Season)\n\nHeader format: By [Insert Date]\n\n• Housing decision path chosen.\n\n• Debt strategy documented and active.\n\n• Minimum viable home clear established.\n\n3. THIS WEEK (Maximum 3 Commitments)\n\nOnly 1–3 commitments allowed. Each must have a clear 'done' definition.\n\nExample placeholders:\n\n• [Commitment 1]\n\n• [Commitment 2]\n\n• [Commitment 3]\n\n4. TODAY (One Lever Only)\n\nSingle action that advances one weekly commitment. No additional task lists visible on homepage.\n\nNavigation Rules\n\nAll deeper planner pages remain intact.\nA simple 'Home' link is added to each deeper page.\nHomepage remains the browser default start page.\nNo metrics, widgets, progress bars, or dashboards added.\n\nVisual Tone Guidelines\n\nBackground: Warm cream or soft neutral.\nText: Dark slate or charcoal (not pure black).\nAccent hierarchy:\n• Deep muted teal for North Star.\n• Warm clay/amber for 90-Day Gate.\n• Soft sage or gray-blue for Weekly.\n• Subtle highlight for Today.\nTypography: Soft serif for headings; clean sans-serif for body.\n\nGuardrails\n\n• Homepage must fit on one screen without scrolling.\n• North Star text remains locked except during scheduled review.\n• No new sections added without revisiting structure intentionally.\n• This page serves orientation, not tracking.";
 
-const DEFAULT_DOMAINS = ["Income","Financial","Home","Health","Relationships"];
+const DEFAULT_DOMAINS = ["Work","Income","Financial","Home","Health"];
 
 /* === planner-test safeguards === */
 const APP_FLAVOR = "planner-test";
@@ -174,7 +174,7 @@ function ensureLifeMapSchema(st){
       if(!notes) return;
       const mapTo = name.includes("health") ? "Health"
         : (name.includes("home") ? "Home"
-        : (name.includes("relat") ? "Relationships"
+        : (name.includes("work") ? "Work"
         : (name.includes("income")||name.includes("work") ? "Income"
         : (name.includes("fin") ? "Financial" : null))));
       if(mapTo){
@@ -564,8 +564,8 @@ function domainClass(domainRaw){
   if(!d) return "domain-other";
   if(d.includes("health")) return "domain-health";
   if(d.includes("home") || d.includes("house")) return "domain-home";
-  if(d.includes("work") || d.includes("income") || d.includes("money") || d.includes("job") || d.includes("career")) return "domain-work-income";
-  if(d.includes("relationship") || d.includes("family") || d.includes("social")) return "domain-relationships";
+  if(d.includes("work") || d.includes("job") || d.includes("career") || d.includes("employ")) return "domain-work";
+  if(d.includes("income") || d.includes("money") || d.includes("revenue") || d.includes("earn")) return "domain-income";
   if(d.includes("creative") || d.includes("meaning") || d.includes("writing") || d.includes("art")) return "domain-creative-meaning";
   return "domain-other";
 }
@@ -767,14 +767,22 @@ function initThreadRegistry(){
       .sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
 
     threadsEl.innerHTML = activeThreads.length ? activeThreads.map(t=>{
-      const inSlot = (String(st.weekly.slot1)===String(t.id) || String(st.weekly.slot2)===String(t.id));
       const domainPillColor = t.domain ? ` domain-pill" data-domain="${escapeAttr((t.domain||"").toLowerCase())}` : ``;
-      const pill = inSlot ? `<span class="pill good">Active this week</span>` : `<span class="pill warn">⏳ Unscheduled</span>`;
       const links = threadBacklinks(t.id);
-      const backlinksHtml = links.length ? `<div class="meta" style="margin-top:6px; flex-wrap:wrap; gap:6px; display:flex">
-        <span class="small" style="color:var(--muted); align-self:center">📍 Goals:</span>
-        ${links.map(l=>`<a href="strategic-life-map.html?focusGoal=${encodeURIComponent(l.goalId)}" class="thread-link-pill" style="text-decoration:none"><span class="tlp-icon">🎯</span><span class="tlp-title">${escapeHtml(l.goalTitle)}</span><span class="tlp-status tls-idle">${escapeHtml(l.hLabel)}</span></a>`).join("")}
-      </div>` : "";
+
+      // Single consolidated schedule pill
+      const horizonStyles = {
+        week:    { bg:"#bbf7d0", color:"#166534", label:"\uD83D\uDCC5 This Week" },
+        month:   { bg:"#bfdbfe", color:"#1e40af", label:"\uD83D\uDDD3 This Month" },
+        quarter: { bg:"#e9d5ff", color:"#6b21a8", label:"\uD83D\uDD2D 3 Months" },
+      };
+      const topLink = links.length ? links[0] : null;
+      const schedStyle = topLink ? (horizonStyles[topLink.hKey] || horizonStyles.week) : null;
+      const pill = topLink
+        ? `<a href="strategic-life-map.html?focusGoal=${encodeURIComponent(topLink.goalId)}" style="text-decoration:none"><span class="pill" style="background:${schedStyle.bg};color:${schedStyle.color};border:none;font-weight:600">${schedStyle.label}</span></a>`
+        : `<span class="pill" style="background:#f1f5f9;color:#64748b;border:none">⏳ Unscheduled</span>`;
+
+      const backlinksHtml = "";
 
       return `
         <div class="item ${domainClass(t.domain)}" data-thread-card="${t.id}" id="thread-${t.id}">
@@ -806,7 +814,7 @@ function initThreadRegistry(){
           <div class="row" style="margin-top:10px">
             <button class="btn primary" data-save="${t.id}">Save</button>
             <button class="btn"         data-edit="${t.id}">Edit</button>
-            <button class="btn"         data-focus="${t.id}">Focus this week</button>
+            <button class="btn"         data-schedule="${t.id}">Schedule</button>
             <button class="btn warn"    data-copy="${t.id}">Copy micro-action</button>
             <button class="btn bad"     data-delete="${t.id}">Delete</button>
           </div>
@@ -837,13 +845,91 @@ function initThreadRegistry(){
       });
     });
 
-    threadsEl.querySelectorAll("[data-focus]").forEach(btn=>{
+    threadsEl.querySelectorAll("[data-schedule]").forEach(btn=>{
       btn.addEventListener("click", ()=>{
-        const id = btn.getAttribute("data-focus");
-        if(!st.weekly.slot1) st.weekly.slot1=id;
-        else if(!st.weekly.slot2) st.weekly.slot2=id;
-        else st.weekly.slot2=id;
-        saveState(st); renderFooter(st); render();
+        const id = btn.getAttribute("data-schedule");
+        const th = st.threads.find(x=>String(x.id)===String(id));
+        if(!th) return;
+
+        // Build popup
+        const existing = document.getElementById("__schedulePop");
+        if(existing) existing.remove();
+
+        const pop = document.createElement("div");
+        pop.id = "__schedulePop";
+        pop.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);z-index:99998;display:flex;align-items:center;justify-content:center";
+        pop.innerHTML = `
+          <div style="background:#fff;border-radius:16px;padding:28px 32px;min-width:280px;box-shadow:0 8px 40px rgba(0,0,0,.18)">
+            <div style="font-weight:700;font-size:16px;margin-bottom:6px">Schedule thread</div>
+            <div style="font-size:13px;color:#64748b;margin-bottom:18px">${escapeHtml(th.title)}</div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <button class="btn primary" data-sch-horizon="week"    style="text-align:left">📅 This Week <span style="font-size:11px;opacity:.7;margin-left:6px">— also adds to weekly slot</span></button>
+              <button class="btn"         data-sch-horizon="month"   style="text-align:left">🗓 This Month</button>
+              <button class="btn"         data-sch-horizon="quarter" style="text-align:left">🔭 3 Months</button>
+            </div>
+            <div style="margin-top:16px"><button class="btn" id="__schCancel">Cancel</button></div>
+          </div>
+        `;
+        document.body.appendChild(pop);
+
+        document.getElementById("__schCancel").onclick = ()=>pop.remove();
+        pop.addEventListener("click", e=>{ if(e.target===pop) pop.remove(); });
+
+        pop.querySelectorAll("[data-sch-horizon]").forEach(hBtn=>{
+          hBtn.addEventListener("click", ()=>{
+            const hKey = hBtn.getAttribute("data-sch-horizon");
+            const domain = th.domain || st.lifeMap.domains[0];
+            const horizonKeys = ["week","month","quarter"];
+
+            // Add to weekly slot if This Week
+            if(hKey==="week"){
+              if(!st.weekly.slot1) st.weekly.slot1=id;
+              else if(!st.weekly.slot2) st.weekly.slot2=id;
+              else st.weekly.slot2=id;
+            }
+
+            // First: sweep all horizons and collect ALL linked goals for this thread
+            const allLinked = [];
+            for(const hk of horizonKeys){
+              for(const d of (st.lifeMap.domains||[])){
+                const list = st.lifeMap.horizons[hk]?.domains?.[d] || [];
+                list.forEach((g,i)=>{
+                  const ids = Array.isArray(g.linkedThreadIds) ? g.linkedThreadIds : (g.threadId ? [g.threadId] : []);
+                  if(ids.map(String).includes(String(id))){
+                    allLinked.push({g, hk, d, i});
+                  }
+                });
+              }
+            }
+
+            // Remove all existing linked goals (we'll re-add to the target horizon)
+            const goalToKeep = allLinked.length > 0 ? allLinked[0].g : null;
+            for(const {hk, d, g} of allLinked){
+              const list = st.lifeMap.horizons[hk].domains[d];
+              const idx = list.findIndex(x=>String(x.id)===String(g.id));
+              if(idx >= 0) list.splice(idx, 1);
+            }
+
+            // Place goal in target horizon
+            const toList = st.lifeMap.horizons[hKey].domains;
+            if(!toList[domain]) toList[domain] = [];
+            if(goalToKeep){
+              goalToKeep.updatedAt = nowIso();
+              toList[domain].unshift(goalToKeep);
+            } else {
+              const now = nowIso();
+              toList[domain].unshift({
+                id: uid(), title: th.title, notes: "", urgency: "medium",
+                createdAt: now, updatedAt: now, linkedThreadIds: [id]
+              });
+            }
+
+            saveState(st);
+            pop.remove();
+            toast(`Scheduled → ${st.lifeMap.horizons[hKey].label}`);
+            renderFooter(st); render();
+          });
+        });
       });
     });
 
