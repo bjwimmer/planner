@@ -271,6 +271,7 @@ function defaultState(){
     weekly: { slot1: null, slot2: null, weekOf: null },
     lifeMap: defaultLifeMap(),
     incomeMap: { startDate: null },
+    trinkets: [],
     longView: {
       objectives: [
         { id:"debt",     label:"No consumer debt",                goals:["","",""] },
@@ -303,6 +304,7 @@ function loadState(){
     if(!st.weekly) st.weekly = { slot1:null, slot2:null, weekOf:null };
     st.lifeMap = normalizeLifeMap(st.lifeMap);
     if(!st.incomeMap) st.incomeMap = { startDate:null };
+    if(!st.trinkets) st.trinkets = [];
     if(!st.longView) st.longView = {
       objectives: [
         { id:"debt",     label:"No consumer debt",                goals:["","",""] },
@@ -643,6 +645,81 @@ function initQuickCapture(){
   });
 
   render();
+
+  // --- Trinket List ---
+  const trinketInput   = document.getElementById('trinketInput');
+  const trinketAdd     = document.getElementById('trinketAdd');
+  const trinketActive  = document.getElementById('trinketActive');
+  const trinketDone    = document.getElementById('trinketDone');
+  const trinketDoneSec = document.getElementById('trinketDoneSection');
+  const trinketClear   = document.getElementById('trinketClearDone');
+
+  function renderTrinkets(){
+    if(!trinketActive) return;
+    const active = st.trinkets.filter(t=>t.status==='open');
+    const done   = st.trinkets.filter(t=>t.status==='done');
+
+    trinketActive.innerHTML = active.length ? active.map(t=>`
+      <div style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid rgba(0,0,0,.06)">
+        <input type="checkbox" data-trinket-check="${t.id}" style="width:18px;height:18px;cursor:pointer;flex-shrink:0"/>
+        <span style="flex:1; font-size:14px">${escapeHtml(t.text)}</span>
+        <button class="btn mini" data-trinket-del="${t.id}" style="color:#ef4444">✕</button>
+      </div>
+    `).join('') : `<div class="small muted" style="padding:8px 0">No trinkets yet. Add something small.</div>`;
+
+    trinketDoneSec.style.display = done.length ? 'block' : 'none';
+    trinketDone.innerHTML = done.map(t=>`
+      <div style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid rgba(0,0,0,.04); opacity:.6">
+        <input type="checkbox" checked data-trinket-uncheck="${t.id}" style="width:18px;height:18px;cursor:pointer;flex-shrink:0"/>
+        <span style="flex:1; font-size:13px; text-decoration:line-through">${escapeHtml(t.text)}</span>
+        <button class="btn mini" data-trinket-del="${t.id}" style="color:#ef4444">✕</button>
+      </div>
+    `).join('');
+
+    // Check → move to done
+    trinketActive.querySelectorAll('[data-trinket-check]').forEach(cb=>{
+      cb.addEventListener('change', ()=>{
+        const t = st.trinkets.find(x=>String(x.id)===cb.getAttribute('data-trinket-check'));
+        if(t){ t.status='done'; t.doneAt=nowIso(); saveState(st); renderTrinkets(); }
+      });
+    });
+    // Uncheck → move back to open
+    trinketDone.querySelectorAll('[data-trinket-uncheck]').forEach(cb=>{
+      cb.addEventListener('change', ()=>{
+        const t = st.trinkets.find(x=>String(x.id)===cb.getAttribute('data-trinket-uncheck'));
+        if(t){ t.status='open'; delete t.doneAt; saveState(st); renderTrinkets(); }
+      });
+    });
+    // Delete buttons
+    document.querySelectorAll('[data-trinket-del]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.getAttribute('data-trinket-del');
+        st.trinkets = st.trinkets.filter(x=>String(x.id)!==String(id));
+        saveState(st); renderTrinkets();
+      });
+    });
+  }
+
+  if(trinketAdd){
+    const addTrinket = ()=>{
+      const text = trinketInput.value.trim();
+      if(!text) return;
+      st.trinkets.push({ id: uid(), text, status:'open', createdAt: nowIso() });
+      trinketInput.value = '';
+      saveState(st); renderTrinkets();
+    };
+    trinketAdd.addEventListener('click', addTrinket);
+    trinketInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addTrinket(); }});
+  }
+
+  if(trinketClear){
+    trinketClear.addEventListener('click', ()=>{
+      st.trinkets = st.trinkets.filter(t=>t.status!=='done');
+      saveState(st); renderTrinkets();
+    });
+  }
+
+  renderTrinkets();
 }
 
 // =============================================================
