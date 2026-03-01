@@ -53,9 +53,9 @@ function esc(s){ return escHtml(s); }
 const NAV_ITEMS = [
   { href: "index.html", label: "Map" },
   { href: "quick-capture.html", label: "⚡ Quick Capture" },
-  { href: "thread-registry.html", label: "Thread Registry" },
   { href: "strategic-life-map.html", label: "Strategic Life Map" },
-  { href: "90-day-income-map.html", label: "90‑Day Income Map" },
+  { href: "thread-registry.html", label: "Thread Registry" },
+  { href: "long-view.html", label: "🔭 Long View" },
   { href: "how-this-works.html", label: "How This Works" },
 ];
 
@@ -270,7 +270,16 @@ function defaultState(){
     threads: [],
     weekly: { slot1: null, slot2: null, weekOf: null },
     lifeMap: defaultLifeMap(),
-    incomeMap: { startDate: null }
+    incomeMap: { startDate: null },
+    longView: {
+      objectives: [
+        { id:"debt",     label:"No consumer debt",                goals:["","",""] },
+        { id:"housing",  label:"Clear housing path",              goals:["","",""] },
+        { id:"income",   label:"Sustainable, sufficient income",  goals:["","",""] },
+        { id:"creative", label:"Time and space for creative work",goals:["","",""] },
+        { id:"health",   label:"Health managed deliberately",     goals:["","",""] },
+      ]
+    }
   };
 }
 
@@ -294,6 +303,16 @@ function loadState(){
     if(!st.weekly) st.weekly = { slot1:null, slot2:null, weekOf:null };
     st.lifeMap = normalizeLifeMap(st.lifeMap);
     if(!st.incomeMap) st.incomeMap = { startDate:null };
+    if(!st.longView) st.longView = {
+      objectives: [
+        { id:"debt",     label:"No consumer debt",                goals:["","",""] },
+        { id:"housing",  label:"Clear housing path",              goals:["","",""] },
+        { id:"income",   label:"Sustainable, sufficient income",  goals:["","",""] },
+        { id:"creative", label:"Time and space for creative work",goals:["","",""] },
+        { id:"health",   label:"Health managed deliberately",     goals:["","",""] },
+      ]
+    };
+    st.longView.objectives.forEach(o=>{ while(o.goals.length<3) o.goals.push(""); });
     return st;
   }catch(e){
     console.warn("State load failed, resetting", e);
@@ -1437,39 +1456,25 @@ function initMorningMap(){
   container.innerHTML = `
 
 
-    <div class="grid2">
-      <div class="card">
-        <div class="cardHeader">
-          <div class="h2">Orientation layer</div>
-        </div>
-        <div class="northStarCard">
-          <div class="h2" style="margin-bottom:6px">North Star</div>
-          <div id="nsPreview" class="nsPreview"></div>
-          <textarea id="nsText" class="nsText" spellcheck="false">${esc(st.meta.northStarText)}</textarea>
-          <div class="row" style="margin-top:10px">
-            <button class="btn primary" id="nsSave">Save</button>
-            <div class="small muted">Keep this short. Read it in 5 seconds.</div>
-          </div>
-        </div>
-        <div class="spacer"></div>
-        <div class="card">
-          <div class="row" style="justify-content:space-between; align-items:center">
-            <div class="h2">System Notes</div>
-          </div>
-          <textarea id="notesText" class="notesText" spellcheck="false">${esc(st.meta.systemNotesText)}</textarea>
-          <div class="row">
-            <button class="btn" id="notesSave">Save</button>
-          </div>
-        </div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="h2" style="margin-bottom:6px">North Star</div>
+      <div id="nsPreview" class="nsPreview"></div>
+      <textarea id="nsText" class="nsText" spellcheck="false">${esc(st.meta.northStarText)}</textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" id="nsSave">Save</button>
+        <div class="small muted">Keep this short. Read it in 5 seconds.</div>
       </div>
+    </div>
 
+    <div class="grid2">
       <div class="stack">
         <div class="card">
-          <div class="h2">Focus strip</div>
-          <div class="muted">Your two active threads for the week.</div>
-          <div class="slot"><div class="small">Weekly Slot #1</div><select id="slot1">${threadOptions}</select></div>
-          <div class="slot"><div class="small">Weekly Slot #2</div><select id="slot2">${threadOptions}</select></div>
-          <div class="row"><button class="btn primary" id="slotsSave">Save</button></div>
+          <div class="h2">MVT: Most Valuable Task</div>
+          <div class="field">
+            <label>Today's MVT</label>
+            <select id="mvtThread">${threadOptions}</select>
+          </div>
+          <div class="row"><button class="btn primary" id="mvtSave">Save</button></div>
         </div>
 
         <div class="card">
@@ -1490,14 +1495,15 @@ function initMorningMap(){
           </div>
           <div class="row"><button class="btn primary" id="igSave">Save</button></div>
         </div>
+      </div>
 
+      <div class="stack">
         <div class="card">
-          <div class="h2">MVT: Most Valuable Task</div>
-          <div class="field">
-            <label>Today's MVT</label>
-            <select id="mvtThread">${threadOptions}</select>
-          </div>
-          <div class="row"><button class="btn primary" id="mvtSave">Save</button></div>
+          <div class="h2">Focus strip</div>
+          <div class="muted">Your two active threads for the week.</div>
+          <div class="slot"><div class="small">Weekly Slot #1</div><select id="slot1">${threadOptions}</select></div>
+          <div class="slot"><div class="small">Weekly Slot #2</div><select id="slot2">${threadOptions}</select></div>
+          <div class="row"><button class="btn primary" id="slotsSave">Save</button></div>
         </div>
 
         <div class="card">
@@ -1532,7 +1538,6 @@ function initMorningMap(){
   document.getElementById('nsText')?.addEventListener('input', updatePreview);
 
   document.getElementById('nsSave')?.addEventListener('click',()=>{ st.meta.northStarText = document.getElementById('nsText').value; saveState(st); toast('Saved'); updatePreview(); });
-  document.getElementById('notesSave')?.addEventListener('click',()=>{ st.meta.systemNotesText = document.getElementById('notesText').value; saveState(st); toast('Saved'); });
   document.getElementById('mmScratchSave')?.addEventListener('click',()=>{ st.meta.morningScratch = document.getElementById('mmScratch').value; saveState(st); toast('Saved'); });
   document.getElementById('sparkSave')?.addEventListener('click',()=>{ st.meta.sparkNotes = document.getElementById('sparkNotes').value; saveState(st); toast('Saved'); });
   document.getElementById('slotsSave')?.addEventListener('click',()=>{
@@ -1548,6 +1553,112 @@ function initMorningMap(){
     saveState(st); toast('Saved');
   });
   document.getElementById('mvtSave')?.addEventListener('click',()=>{ st.meta.mvtThreadId = document.getElementById('mvtThread').value; saveState(st); toast('Saved'); });
+}
+
+// =============================================================
+// --- Long View ---
+// =============================================================
+function initLongView(){
+  dbgMarkInit('longView');
+  const st = initCommon();
+  const container = document.getElementById('mainContent');
+  if(!container) return;
+
+  const domainColors = {
+    debt:     'domain-financial',
+    housing:  'domain-home',
+    income:   'domain-income',
+    creative: 'domain-personal',
+    health:   'domain-health',
+  };
+
+  function render(){
+    const objs = st.longView.objectives;
+    container.innerHTML = `
+      <div style="margin-bottom:18px">
+        <div class="h2" style="font-size:20px; margin-bottom:4px">🔭 Long View</div>
+        <div class="muted">Your objectives and the goals beneath them. Use this to populate the planner.</div>
+      </div>
+      ${objs.map(obj => `
+        <div class="card" style="margin-bottom:16px">
+          <div class="domain-strip ${domainColors[obj.id] || ''}"></div>
+          <div class="h2" style="font-size:17px; margin-bottom:12px">🎯 ${escapeHtml(obj.label)}</div>
+          ${obj.goals.map((g, i) => `
+            <div class="field" style="margin-bottom:10px">
+              <div class="row" style="gap:8px; align-items:center">
+                <input
+                  type="text"
+                  class="lv-goal-input"
+                  data-obj="${obj.id}"
+                  data-idx="${i}"
+                  placeholder="Goal ${i+1} — what does progress look like in 12 weeks?"
+                  value="${escapeHtml(g)}"
+                  style="flex:1"
+                />
+                <button
+                  class="btn mini lv-make-thread"
+                  data-obj="${obj.id}"
+                  data-idx="${i}"
+                  title="Send to Thread Registry"
+                  ${g.trim() ? '' : 'disabled'}
+                >Make Thread</button>
+              </div>
+            </div>
+          `).join('')}
+          <div class="row" style="margin-top:6px">
+            <button class="btn lv-save" data-obj="${obj.id}">Save</button>
+          </div>
+        </div>
+      `).join('')}
+    `;
+
+    // Save buttons
+    container.querySelectorAll('.lv-save').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const objId = btn.getAttribute('data-obj');
+        const obj   = st.longView.objectives.find(o => o.id === objId);
+        if(!obj) return;
+        container.querySelectorAll(`.lv-goal-input[data-obj="${objId}"]`).forEach(inp => {
+          const idx = Number(inp.getAttribute('data-idx'));
+          obj.goals[idx] = inp.value.trim();
+        });
+        saveState(st);
+        toast('Saved');
+        render(); // re-render to update disabled state on Make Thread buttons
+      });
+    });
+
+    // Make Thread buttons
+    container.querySelectorAll('.lv-make-thread').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const objId = btn.getAttribute('data-obj');
+        const idx   = Number(btn.getAttribute('data-idx'));
+        const obj   = st.longView.objectives.find(o => o.id === objId);
+        if(!obj) return;
+        const goalText = obj.goals[idx];
+        if(!goalText) return;
+        const domainMap = {
+          debt: 'Financial', housing: 'Home',
+          income: 'Income', creative: 'Personal', health: 'Health'
+        };
+        const now = nowIso();
+        st.threads.push({
+          id: uid(),
+          title: goalText,
+          status: 'active',
+          domain: domainMap[objId] || 'Personal',
+          nextAction: '',
+          notes: `Created from Long View objective: ${obj.label}`,
+          createdAt: now,
+          updatedAt: now,
+        });
+        saveState(st);
+        toast('Thread created in Thread Registry.');
+      });
+    });
+  }
+
+  render();
 }
 
 // =============================================================
@@ -1570,6 +1681,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
   else if(page==="morningmap" || page==="home"){ dbgMarkInit('morningMap'); initMorningMap();    }
   else if(page==="lifemap")                    { dbgMarkInit('lifeMap');    initLifeMap();       }
   else if(page==="income")                     { dbgMarkInit('income');     initIncomeMap();     }
+  else if(page==="longview")                   { dbgMarkInit('longview');   initLongView();      }
   else if(page==="overview")                   { dbgMarkInit('overview');   initOverview();      }
   else                                         { dbgMarkInit('common');     initCommon();        }
 });
