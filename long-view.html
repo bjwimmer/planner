@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+  <meta http-equiv="Pragma" content="no-cache"/>
+  <meta http-equiv="Expires" content="0"/>
+  <title>Long View · Planner</title>
+  <link rel="icon" href="favicon.ico"/>
+  <link rel="stylesheet" href="assets/style.css?v=53"/>
+</head>
+<body data-page="longview">
+  <div class="topbar">
+    <div class="container">
+      <div class="row" style="justify-content:space-between">
+        <div class="brand">
+          <span style="font-size:20px">🔭</span>
+          <span>Long View</span>
+          <span class="badge" data-sync-indicator>• Not connected</span>
+          <span class="badge" data-build></span>
+        </div>
+        <div class="row" style="gap:8px">
+          <button class="btn" data-open-sync>Sync</button>
+          <button class="btn" data-export>Export</button>
+          <label class="btn" style="cursor:pointer">
+            Import <input type="file" accept="application/json" data-import style="display:none">
+          </label>
+        </div>
+      </div>
+      <div class="nav"></div>
+    </div>
+  </div>
+
+  <div class="container" id="mainContent" style="padding-top:18px; padding-bottom:28px"></div>
+
+  <div class="modal-backdrop" id="syncModalBackdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Sync Settings">
+      <div class="modal-header">
+        <div class="modal-title">Sync (GitHub Gist)</div>
+        <button class="btn" data-close-sync>Close</button>
+      </div>
+      <p class="kicker">Auto-pull on load is ON. Push is manual. Token stays on this device only.</p>
+      <label>Gist ID</label>
+      <input id="syncGistId" placeholder="paste the Gist ID from the URL"/>
+      <label>GitHub Token (gist read/write)</label>
+      <input id="syncToken" type="password" placeholder="paste token here"/>
+      <label style="display:flex;align-items:center;gap:10px;margin-top:10px">
+        <input id="syncAutoPull" type="checkbox" style="width:auto"> Enable auto-pull on page load
+      </label>
+      <div class="row" style="margin-top:12px">
+        <button class="btn" id="syncSave">Save</button>
+        <button class="btn good" id="syncPull">Pull</button>
+        <button class="btn warn" id="syncForcePull">Force Pull</button>
+        <button class="btn primary" id="syncPush">Push</button>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn bad" id="syncClear">Clear sync settings (this device)</button>
+      </div>
+      <p class="small" id="syncStatus"></p>
+      <p class="small">Cloud file name: <span class="mono">planner-data.json</span></p>
+    </div>
+  </div>
+
+  <script src="assets/app.v53.js?v=53"></script>
+</body>
+</html>
