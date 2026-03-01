@@ -1021,10 +1021,39 @@ function initThreadRegistry(){
       // Update existing thread
       const th = st.threads.find(x=>String(x.id)===String(editingId));
       if(th){
+        const oldDomain = th.domain;
         th.title = title;
         th.domain = domain;
         th.nextAction = nextAction;
         th.updatedAt = nowIso();
+
+        // If domain changed, move any linked goals on the Life Map to the new domain
+        if(oldDomain !== domain && st.lifeMap && st.lifeMap.horizons){
+          const horizonKeys = ["week","month","quarter"];
+          for(const hk of horizonKeys){
+            const horizonDomains = st.lifeMap.horizons[hk]?.domains;
+            if(!horizonDomains) continue;
+            for(const d of Object.keys(horizonDomains)){
+              const list = horizonDomains[d];
+              if(!Array.isArray(list)) continue;
+              const toMove = [];
+              const remaining = [];
+              list.forEach(g => {
+                const ids = Array.isArray(g.linkedThreadIds) ? g.linkedThreadIds : (g.threadId ? [g.threadId] : []);
+                if(ids.map(String).includes(String(editingId))){
+                  toMove.push(g);
+                } else {
+                  remaining.push(g);
+                }
+              });
+              if(toMove.length){
+                horizonDomains[d] = remaining;
+                if(!horizonDomains[domain]) horizonDomains[domain] = [];
+                horizonDomains[domain].push(...toMove);
+              }
+            }
+          }
+        }
       }
       delete form.dataset.editingId;
     } else {
@@ -1666,7 +1695,16 @@ function initLongView(){
 // =============================================================
 function initOverview(){
   dbgMarkInit('overview');
-  initCommon();
+  const st = initCommon();
+  const notesEl = document.getElementById('notesText');
+  if(notesEl){
+    notesEl.value = st.meta.systemNotesText || '';
+    document.getElementById('notesSave')?.addEventListener('click',()=>{
+      st.meta.systemNotesText = notesEl.value;
+      saveState(st);
+      toast('Saved');
+    });
+  }
 }
 
 // =============================================================
