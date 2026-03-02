@@ -184,8 +184,10 @@ span.pill.domain-pill[data-domain*="meaning" i]      { background: rgb(236,72,15
 .domain-work .domain-strip          { background: rgba(37,99,235,.70); }
 .domain-work                        { background: linear-gradient(180deg, rgba(239,246,255,.92), rgba(255,255,255,.94)); }
 /* Income — cyan/teal */
-.domain-income .domain-strip        { background: rgba(6,182,212,.70); }
-.domain-income                      { background: linear-gradient(180deg, rgba(236,254,255,.92), rgba(255,255,255,.94)); }
+.domain-income .domain-strip        { background: rgba(124,58,237,.65); }
+.domain-income                      { background: linear-gradient(180deg, rgba(245,243,255,.92), rgba(255,255,255,.94)); }
+.domain-tentative .domain-strip     { background: rgba(148,163,184,.65); }
+.domain-tentative                   { background: linear-gradient(180deg, rgba(248,250,252,.92), rgba(255,255,255,.94)); }
 /* Financial — purple */
 .domain-financial .domain-strip     { background: rgba(124,58,237,.65); }
 .domain-financial                   { background: linear-gradient(180deg, rgba(245,243,255,.92), rgba(255,255,255,.94)); }
@@ -222,7 +224,8 @@ span.pill.domain-pill[data-domain*="meaning" i]      { background: rgb(236,72,15
   color: white;
 }
 .domain-work .domain-head strong         { background: rgb(37,99,235);   color: white; }
-.domain-income .domain-head strong       { background: rgb(6,182,212);   color: white; }
+.domain-income .domain-head strong       { background: rgb(124,58,237);  color: white; }
+.domain-tentative .domain-head strong    { background: rgb(148,163,184);  color: white; }
 .domain-financial .domain-head strong    { background: rgb(100,116,139);  color: white; }
 .domain-personal .domain-head strong     { background: rgb(219,39,119);  color: white; }
 .domain-health .domain-head strong       { background: rgb(5,150,105);   color: white; }

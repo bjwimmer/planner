@@ -1,7 +1,7 @@
 const BUILD_VERSION = "v53";
 const DEFAULT_ORIENTATION_TEXT = "Planner Orientation Layer — Implementation Blueprint v1.0\n\nThis document defines the calm, structured, orientation-first homepage layer for the existing planner system. It is an additive front-layer, not a rebuild. All existing planner pages and logic remain intact.\n\nCore Design Intent\n\nTone: Relaxed, creative, open.\nEmotional Effect: Structured stillness.\nFunction: Orientation before execution.\nRule: One continuous vertical layout. No collapsible sections above the fold.\n\nHomepage Structure (Top to Bottom)\n\n1. NORTH STAR (Locked Section)\n\nAnchoring Sentence (locked, editable only during scheduled review):\n\n\"I finish my life in peace — no debt left behind, no burden passed forward, living comfortably enough to create and care for myself.\"\n\nPractical Bullet Conditions (locked):\n\n• No consumer debt.\n\n• Housing path resolved and documented.\n\n• Home simplified and document-ready.\n\n• Income baseline stable with protected creative time.\n\n2. 90-DAY GATE (Current Season)\n\nHeader format: By [Insert Date]\n\n• Housing decision path chosen.\n\n• Debt strategy documented and active.\n\n• Minimum viable home clear established.\n\n3. THIS WEEK (Maximum 3 Commitments)\n\nOnly 1–3 commitments allowed. Each must have a clear 'done' definition.\n\nExample placeholders:\n\n• [Commitment 1]\n\n• [Commitment 2]\n\n• [Commitment 3]\n\n4. TODAY (One Lever Only)\n\nSingle action that advances one weekly commitment. No additional task lists visible on homepage.\n\nNavigation Rules\n\nAll deeper planner pages remain intact.\nA simple 'Home' link is added to each deeper page.\nHomepage remains the browser default start page.\nNo metrics, widgets, progress bars, or dashboards added.\n\nVisual Tone Guidelines\n\nBackground: Warm cream or soft neutral.\nText: Dark slate or charcoal (not pure black).\nAccent hierarchy:\n• Deep muted teal for North Star.\n• Warm clay/amber for 90-Day Gate.\n• Soft sage or gray-blue for Weekly.\n• Subtle highlight for Today.\nTypography: Soft serif for headings; clean sans-serif for body.\n\nGuardrails\n\n• Homepage must fit on one screen without scrolling.\n• North Star text remains locked except during scheduled review.\n• No new sections added without revisiting structure intentionally.\n• This page serves orientation, not tracking.";
 
-const DEFAULT_DOMAINS = ["Work","Income","Financial","Home","Health","Personal"];
+const DEFAULT_DOMAINS = ["Work","Financial","Home","Health","Personal","Tentative"];
 
 /* === planner-test safeguards === */
 const APP_FLAVOR = "planner-test";
@@ -143,7 +143,7 @@ function defaultLifeMap(){
   const now = nowIso();
   const mkGoal = (title, notes)=>({ id: uid(), title, notes: notes||"", urgency:"medium", createdAt: now, updatedAt: now, linkedThreadIds: [] });
 
-  lm.horizons.quarter.domains["Income"].push(
+  lm.horizons.quarter.domains["Financial"].push(
     mkGoal("Etsy", "T-shirts for fundraising\nCards\nMugs\nNew items\nFundraising (Michael J. Fox / Parkinson's Foundation)"),
     mkGoal("Self-employment", "Construction knowledge / instruction / lead-manager\nCraft options")
   );
@@ -305,15 +305,46 @@ function loadState(){
     st.lifeMap = normalizeLifeMap(st.lifeMap);
     if(!st.incomeMap) st.incomeMap = { startDate:null };
     if(!st.trinkets) st.trinkets = [];
+
+    // Migrate: merge Income domain into Financial
+    if(st.lifeMap && st.lifeMap.horizons){
+      const hKeys = ['week','month','quarter'];
+      for(const hk of hKeys){
+        const hDomains = st.lifeMap.horizons[hk]?.domains;
+        if(!hDomains) continue;
+        if(hDomains['Income'] && hDomains['Income'].length){
+          if(!hDomains['Financial']) hDomains['Financial'] = [];
+          hDomains['Financial'].push(...hDomains['Income']);
+        }
+        delete hDomains['Income'];
+        // Add Tentative if missing
+        if(!hDomains['Tentative']) hDomains['Tentative'] = [];
+      }
+      // Remove Income from domains list, replace with Tentative if needed
+      if(Array.isArray(st.lifeMap.domains)){
+        st.lifeMap.domains = st.lifeMap.domains.filter(d=>d!=='Income');
+        if(!st.lifeMap.domains.includes('Tentative')) st.lifeMap.domains.push('Tentative');
+        if(!st.lifeMap.domains.includes('Financial')) st.lifeMap.domains.push('Financial');
+      }
+    }
+    // Migrate threads: Income domain → Financial
+    if(Array.isArray(st.threads)){
+      st.threads.forEach(t=>{ if(t.domain==='Income') t.domain='Financial'; });
+    }
     if(!st.longView) st.longView = {
       objectives: [
-        { id:"debt",     label:"No consumer debt",                goals:["","",""] },
-        { id:"housing",  label:"Clear housing path",              goals:["","",""] },
-        { id:"income",   label:"Sustainable, sufficient income",  goals:["","",""] },
-        { id:"creative", label:"Time and space for creative work",goals:["","",""] },
-        { id:"health",   label:"Health managed deliberately",     goals:["","",""] },
+        { id:"debt",      label:"No consumer debt",                goals:["","",""] },
+        { id:"housing",   label:"Clear housing path",              goals:["","",""] },
+        { id:"income",    label:"Sustainable, sufficient income",  goals:["","",""] },
+        { id:"creative",  label:"Time and space for creative work",goals:["","",""] },
+        { id:"health",    label:"Health managed deliberately",     goals:["","",""] },
+        { id:"tentative", label:"Tentative",                       goals:["","",""] },
       ]
     };
+    // Add tentative objective if missing
+    if(!st.longView.objectives.find(o=>o.id==="tentative")){
+      st.longView.objectives.push({ id:"tentative", label:"Tentative", goals:["","",""] });
+    }
     st.longView.objectives.forEach(o=>{ while(o.goals.length<3) o.goals.push(""); });
     return st;
   }catch(e){
@@ -586,7 +617,7 @@ function domainClass(domainRaw){
   if(d.includes("health")) return "domain-health";
   if(d.includes("home") || d.includes("house")) return "domain-home";
   if(d.includes("work") || d.includes("job") || d.includes("career") || d.includes("employ")) return "domain-work";
-  if(d.includes("income") || d.includes("money") || d.includes("revenue") || d.includes("earn")) return "domain-income";
+  if(d.includes("financial") || d.includes("income") || d.includes("money") || d.includes("revenue") || d.includes("earn")) return "domain-financial";
   if(d.includes("creative") || d.includes("meaning") || d.includes("writing") || d.includes("art")) return "domain-creative-meaning";
   if(d.includes("personal") || d.includes("self")) return "domain-personal";
   return "domain-other";
@@ -1512,7 +1543,7 @@ function initIncomeMap(){
         if(!cp) return;
         const now = nowIso();
         st.threads.push({
-          id: uid(), title: cp.threadTitle, status: "active", domain: "Income",
+          id: uid(), title: cp.threadTitle, status: "active", domain: "Financial",
           nextAction: cp.nextAction,
           notes: `Created from Income Map checkpoint (Week ${wk}).\n\n${cp.detail}`,
           createdAt: now, updatedAt: now,
@@ -1745,7 +1776,8 @@ function initLongView(){
         if(!goalText) return;
         const domainMap = {
           debt: 'Financial', housing: 'Home',
-          income: 'Income', creative: 'Personal', health: 'Health'
+          income: 'Financial', creative: 'Personal', health: 'Health',
+          tentative: 'Tentative'
         };
         const now = nowIso();
         st.threads.push({
