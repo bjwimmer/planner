@@ -398,16 +398,12 @@ html[data-color="plus"] .card::before{
   align-items:flex-start;
 }
 
-/* Subtle yellow highlight on goal titles */
+/* Goal title — clean, no background box */
 .goal-head strong {
-  background: rgba(254, 243, 199, 0.85);
-  padding: 5px 12px;
-  border-radius: 6px;
   display: inline-block;
   font-size: 16px;
   font-weight: 800;
-  color: #1e3a8a;
-  border-left: 3px solid rgba(217,119,6,.70);
+  color: #1e293b;
 }
 
 .goal .meta{ margin-top:6px; gap:8px; flex-wrap:wrap; display:flex; }
@@ -547,14 +543,15 @@ html[data-color="plus"] .card::before{
 .thread-link-pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
+  gap: 6px;
+  padding: 5px 12px;
   border-radius: 999px;
   border: 1px solid rgba(37,99,235,.30);
   background: rgba(239,246,255,.80);
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
+  min-width: 80px;
   max-width: 100%;
   transition: box-shadow .12s, transform .12s;
 }
