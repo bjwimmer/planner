@@ -1227,9 +1227,8 @@ function initLifeMap(){
     if(!threads.length) return '';
     const pills = threads.map(t=>{
       const badge = threadStatusBadge(t.status);
-      return `<button class="thread-link-pill" type="button" data-open-thread="${escapeAttr(String(t.id))}" title="Open in Thread Registry">`
+      return `<button class="thread-link-pill" type="button" data-open-thread="${escapeAttr(String(t.id))}" title="Open thread: ${escapeAttr(t.title)}">`
         + `<span class="tlp-icon">🧵</span>`
-        + `<span class="tlp-title">${escapeHtml(t.title)}</span>`
         + `<span class="tlp-status ${badge.cls}">${badge.label}</span>`
         + `</button>`;
     }).join("");
@@ -1271,12 +1270,12 @@ function initLifeMap(){
         <div class="domain-strip"></div>
         <div class="goal-head">
           <div>
-            <strong><span style="font-size:11px; font-weight:700; color:#92400e; letter-spacing:.6px; margin-right:6px">GOAL:</span>${escapeHtml(g.title||"")}</strong>
+            <div style="margin-left:4px"><span style="font-size:10px; font-weight:600; color:#94a3b8; letter-spacing:.8px; margin-right:6px; text-transform:uppercase">Goal</span><span style="font-size:16px; font-weight:800; color:#1e293b">${escapeHtml(g.title||"")}</span></div>
             <div class="meta">
               <span class="pill domain-pill" data-domain="${escapeAttr(domain.toLowerCase())}">${escapeHtml(domain)}</span>
             </div>
             ${threadLinksHtml(g)}
-            ${(()=>{ const linked = (g.linkedThreadIds||[]).map(id=>st.threads.find(t=>t.id===id)).filter(Boolean); const actions = linked.map(t=>t.nextAction).filter(Boolean); return actions.length ? `<div style="margin-top:8px; padding:8px 10px; background:rgba(239,246,255,.85); border-left:4px solid rgba(37,99,235,.60); border-radius:0 8px 8px 0"><div style="font-size:11px; font-weight:700; color:#1e40af; letter-spacing:.8px; margin-bottom:3px"><span style="color:#f59e0b">⚡</span> NEXT ACTION <span style="color:#f59e0b">⚡</span></div><div style="font-size:14px; font-weight:700; color:#1e3a8a">${escapeHtml(actions[0])}</div></div>` : ""; })()}
+            ${(()=>{ const linked = (g.linkedThreadIds||[]).map(id=>st.threads.find(t=>t.id===id)).filter(Boolean); const actions = linked.map(t=>t.nextAction).filter(Boolean); return actions.length ? `<div style="margin-top:8px; padding:10px 14px; background:rgba(186,230,253,.55); border-left:4px solid rgba(14,165,233,.50); border-radius:0 8px 8px 0; box-shadow:0 1px 4px rgba(14,165,233,.15)"><div style="font-size:10px; font-weight:700; color:#334155; letter-spacing:.8px; margin-bottom:4px"><span style="color:#facc15">⚡</span> NEXT ACTION <span style="color:#facc15">⚡</span></div><div style="font-size:14px; font-weight:700; color:#0f172a">${escapeHtml(actions[0])}</div></div>` : ""; })()}
           </div>
           <div class="row" style="justify-content:flex-end; gap:8px">
             ${leftBtn}
