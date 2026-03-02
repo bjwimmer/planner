@@ -908,7 +908,7 @@ function initThreadRegistry(){
       const schedStyle = topLink ? (horizonStyles[topLink.hKey] || horizonStyles.week) : null;
       const pill = topLink
         ? `<a href="strategic-life-map.html?focusGoal=${encodeURIComponent(topLink.goalId)}" style="text-decoration:none"><span class="pill" style="background:${schedStyle.bg};color:${schedStyle.color};border:none;font-weight:600">${schedStyle.label}</span></a>`
-        : `<span class="pill" style="background:#fbbf24;color:#78350f;border:none;font-weight:700">⏳ Unscheduled</span>`;
+        : `<span class="pill" style="background:#fef08a;color:#713f12;border:1px solid #facc15;font-weight:700">⏳ Unscheduled</span>`;
 
       const backlinksHtml = "";
 
