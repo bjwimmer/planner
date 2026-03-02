@@ -1720,7 +1720,9 @@ function initLongView(){
         <div class="card" style="margin-bottom:16px">
           <div class="domain-strip ${domainColors[obj.id] || ''}"></div>
           <div class="h2" style="font-size:17px; margin-bottom:12px">🎯 ${escapeHtml(obj.label)}</div>
-          ${obj.goals.map((g, i) => `
+          ${obj.goals.map((g, i) => {
+            const hasThread = g.trim() && st.threads.some(t => t.title === g.trim());
+            return `
             <div class="field" style="margin-bottom:10px">
               <div class="row" style="gap:8px; align-items:center">
                 <input
@@ -1736,12 +1738,13 @@ function initLongView(){
                   class="btn mini lv-make-thread"
                   data-obj="${obj.id}"
                   data-idx="${i}"
-                  title="Send to Thread Registry"
+                  title="${hasThread ? 'Thread already exists in Registry' : 'Send to Thread Registry'}"
                   ${g.trim() ? '' : 'disabled'}
-                >Make Thread</button>
+                  style="${hasThread ? 'background:rgba(16,185,129,.15); color:#059669; border:1px solid rgba(16,185,129,.4); cursor:default;' : ''}"
+                >${hasThread ? '✓ Thread exists' : 'Make Thread'}</button>
               </div>
             </div>
-          `).join('')}
+          `}).join('')}
           <div class="row" style="margin-top:6px">
             <button class="btn lv-save" data-obj="${obj.id}">Save</button>
           </div>
@@ -1774,6 +1777,8 @@ function initLongView(){
         if(!obj) return;
         const goalText = obj.goals[idx];
         if(!goalText) return;
+        // Prevent duplicate threads
+        if(st.threads.some(t => t.title === goalText.trim())){ toast('A thread for this goal already exists.'); return; }
         const domainMap = {
           debt: 'Financial', housing: 'Home',
           income: 'Financial', creative: 'Personal', health: 'Health',
@@ -1792,6 +1797,7 @@ function initLongView(){
         });
         saveState(st);
         toast('Thread created in Thread Registry.');
+        render();
       });
     });
   }
