@@ -156,11 +156,11 @@ span.pill.domain-pill {
   color: white;
   background: rgb(100,116,139);
 }
-span.pill.domain-pill[data-domain*="health" i]       { background: rgb(5,150,105) !important; }
+span.pill.domain-pill[data-domain*="health" i]       { background: rgb(124,58,237) !important; }
 span.pill.domain-pill[data-domain*="home" i]         { background: rgb(217,119,6) !important; }
 span.pill.domain-pill[data-domain*="work" i]         { background: rgb(37,99,235) !important; }
 span.pill.domain-pill[data-domain*="income" i]       { background: rgb(124,58,237) !important; }
-span.pill.domain-pill[data-domain*="financial" i]    { background: rgb(124,58,237) !important; }
+span.pill.domain-pill[data-domain*="financial" i]    { background: rgb(5,150,105) !important; }
 span.pill.domain-pill[data-domain*="tentative" i]    { background: rgb(148,163,184) !important; }
 span.pill.domain-pill[data-domain*="personal" i]     { background: rgb(219,39,119) !important; }
 span.pill.domain-pill[data-domain*="creative" i],
@@ -190,11 +190,11 @@ span.pill.domain-pill[data-domain*="meaning" i]      { background: rgb(236,72,15
 .domain-tentative .domain-strip     { background: rgba(148,163,184,.65); }
 .domain-tentative                   { background: linear-gradient(180deg, rgba(248,250,252,.92), rgba(255,255,255,.94)); }
 /* Financial — purple */
-.domain-financial .domain-strip     { background: rgba(124,58,237,.65); }
-.domain-financial                   { background: linear-gradient(180deg, rgba(245,243,255,.92), rgba(255,255,255,.94)); }
+.domain-financial .domain-strip     { background: rgba(5,150,105,.70); }
+.domain-financial                   { background: linear-gradient(180deg, rgba(236,253,245,.90), rgba(255,255,255,.94)); }
 /* Health — green */
-.domain-health .domain-strip        { background: rgba(5,150,105,.70); }
-.domain-health                      { background: linear-gradient(180deg, rgba(236,253,245,.90), rgba(255,255,255,.94)); }
+.domain-health .domain-strip        { background: rgba(124,58,237,.65); }
+.domain-health                      { background: linear-gradient(180deg, rgba(245,243,255,.92), rgba(255,255,255,.94)); }
 /* Home — amber */
 .domain-home .domain-strip          { background: rgba(217,119,6,.70); }
 .domain-home                        { background: linear-gradient(180deg, rgba(255,251,235,.92), rgba(255,255,255,.94)); }
@@ -227,9 +227,9 @@ span.pill.domain-pill[data-domain*="meaning" i]      { background: rgb(236,72,15
 .domain-work .domain-head strong         { background: rgb(37,99,235);   color: white; }
 .domain-income .domain-head strong       { background: rgb(124,58,237);  color: white; }
 .domain-tentative .domain-head strong    { background: rgb(148,163,184);  color: white; }
-.domain-financial .domain-head strong    { background: rgb(124,58,237);   color: white; }
+.domain-financial .domain-head strong    { background: rgb(5,150,105);    color: white; }
 .domain-personal .domain-head strong     { background: rgb(219,39,119);  color: white; }
-.domain-health .domain-head strong       { background: rgb(5,150,105);   color: white; }
+.domain-health .domain-head strong       { background: rgb(124,58,237);   color: white; }
 .domain-home .domain-head strong         { background: rgb(217,119,6);   color: white; }
 .domain-creative-meaning .domain-head strong { background: rgb(236,72,153); color: white; }
 .domain-work-income .domain-head strong  { background: rgb(37,99,235);   color: white; }
