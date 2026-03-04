@@ -305,6 +305,7 @@ function loadState(){
     st.lifeMap = normalizeLifeMap(st.lifeMap);
     if(!st.incomeMap) st.incomeMap = { startDate:null };
     if(!st.trinkets) st.trinkets = [];
+    if(!st.lifeMap.archivedGoals) st.lifeMap.archivedGoals = [];
 
     // Migrate: merge Income domain into Financial
     if(st.lifeMap && st.lifeMap.horizons){
@@ -1300,6 +1301,8 @@ function initLifeMap(){
             <button class="btn good"    data-thread-from-goal="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">🧵 Create Thread</button>
             ${attachThreadPickerHtml(g, domain)}
             <div style="height:8px"></div>
+            <button class="btn" style="background:rgba(100,116,139,.12);color:#475569;border:1px solid rgba(100,116,139,.25)" data-archive-goal="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">Archive</button>
+            <div style="height:6px"></div>
             <button class="btn bad"     data-delete-goal="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">Delete</button>
           </div>
         </div>
@@ -1362,7 +1365,70 @@ function initLifeMap(){
           `;
         }).join("")}
       </div>
+
+      ${(()=>{
+        const archived = st.lifeMap.archivedGoals || [];
+        if(!archived.length) return '';
+        return `
+          <div style="margin-top:24px">
+            <button id="toggleArchive" style="background:none;border:none;cursor:pointer;font-size:13px;font-weight:600;color:#64748b;padding:8px 0;display:flex;align-items:center;gap:6px">
+              <span id="archiveChevron">▶</span> Archived Goals (${archived.length})
+            </button>
+            <div id="archivedList" style="display:none; margin-top:10px">
+              ${archived.map(a=>`
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(248,250,252,.9);border:1px solid rgba(215,222,233,.8);border-radius:12px;margin-bottom:8px">
+                  <div style="flex:1">
+                    <div style="font-weight:700;font-size:14px;color:#334155">${escapeHtml(a.title)}</div>
+                    <div style="font-size:11px;color:#94a3b8;margin-top:2px">${escapeHtml(a.domain)} · ${escapeHtml(a.horizon)} · archived ${new Date(a.archivedAt).toLocaleDateString()}</div>
+                  </div>
+                  <button class="btn mini" data-restore-goal="${a.id}" style="color:#059669;border-color:rgba(5,150,105,.3)">Restore</button>
+                  <button class="btn mini bad" data-perm-delete-goal="${a.id}">Delete</button>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      })()}
     `;
+
+    // Toggle archive section
+    root.querySelector('#toggleArchive')?.addEventListener('click', ()=>{
+      const list = root.querySelector('#archivedList');
+      const chev = root.querySelector('#archiveChevron');
+      if(list.style.display === 'none'){ list.style.display='block'; chev.textContent='▼'; }
+      else { list.style.display='none'; chev.textContent='▶'; }
+    });
+
+    // Restore goal
+    root.querySelectorAll('[data-restore-goal]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.getAttribute('data-restore-goal');
+        const archived = st.lifeMap.archivedGoals || [];
+        const idx = archived.findIndex(x=>String(x.id)===String(id));
+        if(idx<0) return;
+        const a = archived[idx];
+        // Restore to original horizon/domain if possible, else quarter
+        const hKey = a.horizonKey || 'quarter';
+        const domain = a.domain || (st.lifeMap.domains||[])[0];
+        if(!st.lifeMap.horizons[hKey]) st.lifeMap.horizons[hKey] = { label: a.horizon, domains:{} };
+        if(!st.lifeMap.horizons[hKey].domains[domain]) st.lifeMap.horizons[hKey].domains[domain] = [];
+        const { archivedAt, horizonKey, horizon, ...goal } = a;
+        st.lifeMap.horizons[hKey].domains[domain].unshift(goal);
+        archived.splice(idx, 1);
+        saveState(st); renderFooter(st); render();
+        toast('Goal restored.');
+      });
+    });
+
+    // Permanently delete archived goal
+    root.querySelectorAll('[data-perm-delete-goal]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.getAttribute('data-perm-delete-goal');
+        if(!confirm('Permanently delete this goal?')) return;
+        st.lifeMap.archivedGoals = (st.lifeMap.archivedGoals||[]).filter(x=>String(x.id)!==String(id));
+        saveState(st); renderFooter(st); render();
+      });
+    });
 
     // Add goal
     root.querySelectorAll("[data-add-goal]").forEach(btn=>{
@@ -1403,6 +1469,30 @@ function initLifeMap(){
         g.urgency  = root.querySelector(`[data-urgency="${cssEscape(id)}"]`)?.value ?? "medium";
         g.updatedAt = nowIso();
         saveState(st); renderFooter(st); render();
+      });
+    });
+
+    // Archive goal
+    root.querySelectorAll("[data-archive-goal]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id     = btn.getAttribute("data-archive-goal");
+        const hKey   = btn.getAttribute("data-h");
+        const domain = btn.getAttribute("data-d");
+        const list   = st.lifeMap.horizons[hKey]?.domains?.[domain];
+        if(!list) return;
+        const idx = list.findIndex(x=>String(x.id)===String(id));
+        if(idx<0) return;
+        const goal = list.splice(idx, 1)[0];
+        if(!st.lifeMap.archivedGoals) st.lifeMap.archivedGoals = [];
+        st.lifeMap.archivedGoals.unshift({
+          ...goal,
+          horizonKey: hKey,
+          horizon: st.lifeMap.horizons[hKey]?.label || hKey,
+          domain,
+          archivedAt: nowIso()
+        });
+        saveState(st); renderFooter(st); render();
+        toast('Goal archived.');
       });
     });
 
