@@ -53,8 +53,8 @@ function esc(s){ return escHtml(s); }
 const NAV_ITEMS = [
   { href: "index.html", label: "Map" },
   { href: "quick-capture.html", label: "⚡ Quick Capture" },
-  { href: "strategic-life-map.html", label: "Strategic Life Map" },
   { href: "thread-registry.html", label: "Thread Registry" },
+  { href: "strategic-life-map.html", label: "Strategic Life Map" },
   { href: "long-view.html", label: "🔭 Long View" },
   { href: "how-this-works.html", label: "How This Works" },
 ];
@@ -482,11 +482,11 @@ async function githubPull({force=false} = {}){
   const localState = loadState();
   const remoteUpdated = parseIso(remoteState?.meta?.updatedAt);
   const localUpdated  = parseIso(localState?.meta?.updatedAt);
-  if(force || remoteUpdated >= localUpdated){
+  if(force || remoteUpdated > localUpdated){
     saveState(remoteState);
-    return {applied:true, reason: force ? "forced" : "remote-newer-or-equal", remoteUpdated, localUpdated};
+    return {applied:true, reason: force ? "forced" : "remote-newer", remoteUpdated, localUpdated};
   }
-  return {applied:false, reason:"local-newer", remoteUpdated, localUpdated};
+  return {applied:false, reason:"local-newer-or-equal", remoteUpdated, localUpdated};
 }
 
 async function githubPush(){
@@ -764,6 +764,21 @@ function initThreadRegistry(){
   const inboxEl   = document.querySelector("#registryInbox");
   const threadsEl = document.querySelector("#threadsList");
   const form      = document.querySelector("#newThreadForm");
+
+  // Delegated archive handler — attached once, survives re-renders
+  threadsEl.addEventListener("click", e=>{
+    const btn = e.target.closest("[data-archive-thread]");
+    if(!btn) return;
+    const id = btn.getAttribute("data-archive-thread");
+    const th = st.threads.find(x=>String(x.id)===String(id));
+    if(!th) return;
+    th.status = "archived";
+    th.updatedAt = nowIso();
+    if(String(st.weekly?.slot1)===String(id)) st.weekly.slot1=null;
+    if(String(st.weekly?.slot2)===String(id)) st.weekly.slot2=null;
+    saveState(st); renderFooter(st); render();
+    toast("Thread archived.");
+  });
   const focusThreadId = new URLSearchParams(location.search).get("focusThread");
 
   // Focus glow style
@@ -891,8 +906,12 @@ function initThreadRegistry(){
   }
 
   function renderThreads(){
+    const showArchived = document.querySelector('[data-toggle-archived]')?.checked || false;
     const activeThreads = st.threads
       .filter(t=>t.status!=="archived")
+      .sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
+    const archivedThreads = st.threads
+      .filter(t=>t.status==="archived")
       .sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
 
     threadsEl.innerHTML = activeThreads.length ? activeThreads.map(t=>{
@@ -945,6 +964,7 @@ function initThreadRegistry(){
             <button class="btn"         data-edit="${t.id}">Edit</button>
             <button class="btn"         data-schedule="${t.id}">Schedule</button>
             <button class="btn warn"    data-copy="${t.id}">Copy micro-action</button>
+            <button class="btn" style="background:rgba(100,116,139,.12);color:#475569;border:1px solid rgba(100,116,139,.25)" data-archive-thread="${t.id}">Archive</button>
             <button class="btn bad"     data-delete="${t.id}">Delete</button>
           </div>
         </div>
@@ -1111,10 +1131,75 @@ function initThreadRegistry(){
     });
   }
 
+  function renderArchivedThreads(){
+    const section = document.getElementById('archivedThreadsSection');
+    if(!section) return;
+
+    const archivedThreads = st.threads
+      .filter(t=>t.status==="archived")
+      .sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+
+    if(!archivedThreads.length){ section.innerHTML = ''; return; }
+
+    // Preserve open/closed state across re-renders
+    const wasOpen = section.querySelector('#archivedThreadList')?.style.display === 'block';
+
+    section.innerHTML = `
+      <div class="card">
+        <button id="toggleArchivedThreads" style="background:none;border:none;cursor:pointer;font-size:13px;font-weight:600;color:#64748b;padding:4px 0;display:flex;align-items:center;gap:6px;width:100%">
+          <span id="archivedThreadChevron">${wasOpen ? '▼' : '▶'}</span> Archived Threads (${archivedThreads.length})
+        </button>
+        <div id="archivedThreadList" style="display:${wasOpen ? 'block' : 'none'}; margin-top:12px">
+          ${archivedThreads.map(t=>`
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(248,250,252,.9);border:1px solid rgba(215,222,233,.8);border-radius:12px;margin-bottom:8px">
+              <div style="flex:1">
+                <div style="font-weight:700;font-size:14px;color:#334155">${escapeHtml(t.title)}</div>
+                <div style="font-size:11px;color:#94a3b8;margin-top:2px">
+                  ${t.domain ? `<span style="margin-right:8px">${escapeHtml(t.domain)}</span>` : ''}
+                  archived ${new Date(t.updatedAt||t.createdAt).toLocaleDateString()}
+                </div>
+              </div>
+              <button class="btn mini" data-restore-thread="${t.id}" style="color:#059669;border-color:rgba(5,150,105,.3)">Restore</button>
+              <button class="btn mini bad" data-perm-delete-thread="${t.id}">Delete</button>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+    // Toggle
+    section.querySelector('#toggleArchivedThreads')?.addEventListener('click', ()=>{
+      const list = section.querySelector('#archivedThreadList');
+      const chev = section.querySelector('#archivedThreadChevron');
+      if(list.style.display === 'none'){ list.style.display='block'; chev.textContent='▼'; }
+      else { list.style.display='none'; chev.textContent='▶'; }
+    });
+
+    // Restore thread
+    section.querySelectorAll('[data-restore-thread]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.getAttribute('data-restore-thread');
+        const t = st.threads.find(x=>String(x.id)===String(id));
+        if(t){ t.status='active'; t.updatedAt=nowIso(); saveState(st); renderFooter(st); render(); toast('Thread restored.'); }
+      });
+    });
+
+    // Permanently delete thread
+    section.querySelectorAll('[data-perm-delete-thread]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.getAttribute('data-perm-delete-thread');
+        if(!confirm('Permanently delete this thread?')) return;
+        st.threads = st.threads.filter(x=>String(x.id)!==String(id));
+        saveState(st); renderFooter(st); render(); toast('Thread deleted.');
+      });
+    });
+  }
+
   function render(){
     renderWeeklySlots();
     renderInbox();
     renderThreads();
+    renderArchivedThreads();
   }
 
   form.addEventListener("submit",(e)=>{
@@ -1224,7 +1309,7 @@ function initLifeMap(){
   function threadLinksHtml(g){
     const ids = Array.isArray(g.linkedThreadIds) ? g.linkedThreadIds : [];
     if(!ids.length) return '';
-    const threads = ids.map(id => st.threads.find(t => String(t.id)===String(id))).filter(Boolean);
+    const threads = ids.map(id => st.threads.find(t => String(t.id)===String(id))).filter(t => t && t.status !== "archived");
     if(!threads.length) return '';
     const pills = threads.map(t=>{
       const badge = threadStatusBadge(t.status);
@@ -1276,7 +1361,7 @@ function initLifeMap(){
               <span class="pill domain-pill" data-domain="${escapeAttr(domain.toLowerCase())}">${escapeHtml(domain)}</span>
             </div>
             ${threadLinksHtml(g)}
-            ${(()=>{ const linked = (g.linkedThreadIds||[]).map(id=>st.threads.find(t=>t.id===id)).filter(Boolean); const actions = linked.map(t=>t.nextAction).filter(Boolean); return actions.length ? `<div style="margin-top:8px; padding:10px 14px; background:#ffffcc; border-left:4px solid #e5e500; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.08)"><div style="font-size:10px; font-weight:700; color:#334155; letter-spacing:.8px; margin-bottom:4px"><span style="color:#dc2626">⚡</span> NEXT ACTION <span style="color:#dc2626">⚡</span></div><div style="font-size:14px; font-weight:700; color:#0f172a">${escapeHtml(actions[0])}</div></div>` : ""; })()}
+            ${(()=>{ const linked = (g.linkedThreadIds||[]).map(id=>st.threads.find(t=>t.id===id)).filter(t=>t && t.status!=="archived"); const actions = linked.map(t=>t.nextAction).filter(Boolean); return actions.length ? `<div style="margin-top:8px; padding:10px 14px; background:#ffffcc; border-left:4px solid #e5e500; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.08)"><div style="font-size:10px; font-weight:700; color:#334155; letter-spacing:.8px; margin-bottom:4px"><span style="color:#dc2626">⚡</span> NEXT ACTION <span style="color:#dc2626">⚡</span></div><div style="font-size:14px; font-weight:700; color:#0f172a">${escapeHtml(actions[0])}</div></div>` : ""; })()}
           </div>
           <div class="row" style="justify-content:flex-end; gap:8px">
             ${leftBtn}
@@ -1369,12 +1454,13 @@ function initLifeMap(){
       ${(()=>{
         const archived = st.lifeMap.archivedGoals || [];
         if(!archived.length) return '';
+        const wasOpen = root.querySelector('#archivedList')?.style.display === 'block';
         return `
           <div style="margin-top:24px">
             <button id="toggleArchive" style="background:none;border:none;cursor:pointer;font-size:13px;font-weight:600;color:#64748b;padding:8px 0;display:flex;align-items:center;gap:6px">
-              <span id="archiveChevron">▶</span> Archived Goals (${archived.length})
+              <span id="archiveChevron">${wasOpen ? '▼' : '▶'}</span> Archived Goals (${archived.length})
             </button>
-            <div id="archivedList" style="display:none; margin-top:10px">
+            <div id="archivedList" style="display:${wasOpen ? 'block' : 'none'}; margin-top:10px">
               ${archived.map(a=>`
                 <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(248,250,252,.9);border:1px solid rgba(215,222,233,.8);border-radius:12px;margin-bottom:8px">
                   <div style="flex:1">
@@ -1414,9 +1500,15 @@ function initLifeMap(){
         if(!st.lifeMap.horizons[hKey].domains[domain]) st.lifeMap.horizons[hKey].domains[domain] = [];
         const { archivedAt, horizonKey, horizon, ...goal } = a;
         st.lifeMap.horizons[hKey].domains[domain].unshift(goal);
+        // Restore linked threads too
+        const linkedIds = Array.isArray(goal.linkedThreadIds) ? goal.linkedThreadIds : [];
+        linkedIds.forEach(tid => {
+          const t = st.threads.find(x=>String(x.id)===String(tid));
+          if(t && t.status === 'archived') t.status = 'active';
+        });
         archived.splice(idx, 1);
         saveState(st); renderFooter(st); render();
-        toast('Goal restored.');
+        toast('Goal and linked threads restored.');
       });
     });
 
@@ -1484,6 +1576,14 @@ function initLifeMap(){
         if(idx<0) return;
         const goal = list.splice(idx, 1)[0];
         if(!st.lifeMap.archivedGoals) st.lifeMap.archivedGoals = [];
+
+        // Archive any linked threads too
+        const linkedIds = Array.isArray(goal.linkedThreadIds) ? goal.linkedThreadIds : [];
+        linkedIds.forEach(tid => {
+          const t = st.threads.find(x=>String(x.id)===String(tid));
+          if(t && t.status !== 'archived') t.status = 'archived';
+        });
+
         st.lifeMap.archivedGoals.unshift({
           ...goal,
           horizonKey: hKey,
@@ -1492,7 +1592,8 @@ function initLifeMap(){
           archivedAt: nowIso()
         });
         saveState(st); renderFooter(st); render();
-        toast('Goal archived.');
+        const threadCount = linkedIds.length;
+        toast(`Goal archived${threadCount ? ` (+ ${threadCount} linked thread${threadCount>1?'s':''})` : ''}.`);
       });
     });
 
