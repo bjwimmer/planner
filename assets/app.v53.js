@@ -1356,7 +1356,14 @@ function initLifeMap(){
         <div class="domain-strip"></div>
         <div class="goal-head">
           <div>
-            <div style="margin-left:4px"><span style="font-size:10px; font-weight:600; color:#94a3b8; letter-spacing:.8px; margin-right:6px; text-transform:uppercase">Goal</span><span style="font-size:16px; font-weight:800; color:#1e293b">${escapeHtml(g.title||"")}</span></div>
+            <div style="margin-left:4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap">
+              <span style="font-size:10px; font-weight:600; color:#94a3b8; letter-spacing:.8px; text-transform:uppercase">Goal</span>
+              <span class="goal-title-display" data-goal-title="${g.id}" style="font-size:16px; font-weight:800; color:#1e293b">${escapeHtml(g.title||"")}</span>
+              <input class="goal-title-input" data-goal-title-input="${g.id}" value="${escapeHtml(g.title||"")}" style="display:none; font-size:16px; font-weight:800; color:#1e293b; border:1px solid rgba(99,102,241,.4); border-radius:6px; padding:2px 8px; flex:1; min-width:200px"/>
+              <button class="btn mini goal-title-edit" data-edit-title="${g.id}" style="font-size:11px; padding:3px 8px; color:#6366f1; border-color:rgba(99,102,241,.3)">Edit</button>
+              <button class="btn mini goal-title-save" data-save-title="${g.id}" style="display:none; font-size:11px; padding:3px 8px; color:#059669; border-color:rgba(5,150,105,.3)">Save</button>
+              <button class="btn mini goal-title-cancel" data-cancel-title="${g.id}" style="display:none; font-size:11px; padding:3px 8px">Cancel</button>
+            </div>
             <div class="meta">
               <span class="pill domain-pill" data-domain="${escapeAttr(domain.toLowerCase())}">${escapeHtml(domain)}</span>
             </div>
@@ -1561,6 +1568,48 @@ function initLifeMap(){
         g.urgency  = root.querySelector(`[data-urgency="${cssEscape(id)}"]`)?.value ?? "medium";
         g.updatedAt = nowIso();
         saveState(st); renderFooter(st); render();
+      });
+    });
+
+    // Edit goal title
+    root.querySelectorAll("[data-edit-title]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-edit-title");
+        root.querySelector(`[data-goal-title="${id}"]`).style.display = "none";
+        root.querySelector(`[data-goal-title-input="${id}"]`).style.display = "inline-block";
+        root.querySelector(`[data-edit-title="${id}"]`).style.display = "none";
+        root.querySelector(`[data-save-title="${id}"]`).style.display = "inline-block";
+        root.querySelector(`[data-cancel-title="${id}"]`).style.display = "inline-block";
+        root.querySelector(`[data-goal-title-input="${id}"]`).focus();
+      });
+    });
+
+    root.querySelectorAll("[data-save-title]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-save-title");
+        const inp = root.querySelector(`[data-goal-title-input="${id}"]`);
+        const newTitle = inp.value.trim();
+        if(!newTitle){ toast("Title can't be empty."); return; }
+        // Find and update goal in state
+        for(const hk of ["week","month","quarter"]){
+          for(const d of Object.keys(st.lifeMap.horizons[hk]?.domains||{})){
+            const g = st.lifeMap.horizons[hk].domains[d].find(x=>String(x.id)===String(id));
+            if(g){ g.title = newTitle; g.updatedAt = nowIso(); }
+          }
+        }
+        saveState(st); renderFooter(st); render();
+        toast("Goal title updated.");
+      });
+    });
+
+    root.querySelectorAll("[data-cancel-title]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-cancel-title");
+        root.querySelector(`[data-goal-title="${id}"]`).style.display = "inline";
+        root.querySelector(`[data-goal-title-input="${id}"]`).style.display = "none";
+        root.querySelector(`[data-edit-title="${id}"]`).style.display = "inline-block";
+        root.querySelector(`[data-save-title="${id}"]`).style.display = "none";
+        root.querySelector(`[data-cancel-title="${id}"]`).style.display = "none";
       });
     });
 
