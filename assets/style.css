@@ -274,8 +274,8 @@ body[data-page="how"] .topbar{ background: rgba(248,250,252,.88); }
 .nav a[data-nav][href="thread-registry.html"].active{ background: rgba(5,150,105,.10); border-color: rgba(5,150,105,.50); box-shadow: 0 0 0 3px rgba(5,150,105,.10) inset, 0 12px 22px rgba(5,150,105,.12); }
 .nav a[data-nav][href="strategic-life-map.html"]{ border-color: rgba(124,58,237,.30); }
 .nav a[data-nav][href="strategic-life-map.html"].active{ background: rgba(124,58,237,.10); border-color: rgba(124,58,237,.50); box-shadow: 0 0 0 3px rgba(124,58,237,.10) inset, 0 12px 22px rgba(124,58,237,.12); }
-.nav a[data-nav][href="income-map.html"]{ border-color: rgba(37,99,235,.30); }
-.nav a[data-nav][href="income-map.html"].active{ background: rgba(37,99,235,.10); border-color: rgba(37,99,235,.55); }
+.nav a[data-nav][href="90-day-income-map.html"]{ border-color: rgba(37,99,235,.30); }
+.nav a[data-nav][href="90-day-income-map.html"].active{ background: rgba(37,99,235,.10); border-color: rgba(37,99,235,.55); }
 
 /* Dopamine mode */
 body.dopamine{
@@ -539,8 +539,14 @@ html[data-color="plus"] .card::before{
 .thread-links-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   margin-top: 8px;
+}
+.thread-link-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
 }
 .thread-link-pill {
   display: inline-flex;
@@ -561,12 +567,40 @@ html[data-color="plus"] .card::before{
   box-shadow: 0 6px 16px rgba(37,99,235,.18);
   transform: translateY(-1px);
 }
+.thread-unlink-btn {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:24px;
+  height:24px;
+  border-radius:999px;
+  border:1px solid rgba(244,114,182,.35);
+  background: rgba(253,242,248,.95);
+  color:#be185d;
+  font-size:16px;
+  line-height:1;
+  cursor:pointer;
+  padding:0;
+}
+.thread-unlink-btn:hover {
+  background:#fce7f3;
+  box-shadow:0 4px 12px rgba(190,24,93,.14);
+}
+.attach-thread-box { margin-top: 8px; }
+.attach-thread-toggle {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin:6px 0;
+}
+.attach-thread-toggle input { width:auto; }
+.attach-thread-helper { margin: 4px 0 8px; color:#64748b; }
 .tlp-icon  { flex-shrink: 0; }
 .tlp-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 160px;
+  max-width: 180px;
   color: #1e40af;
 }
 .tlp-status {

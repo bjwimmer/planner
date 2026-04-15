@@ -1,41 +1,33 @@
-const BUILD_VERSION = "v53";
+const BUILD_VERSION = "v54";
 const DEFAULT_ORIENTATION_TEXT = "Planner Orientation Layer — Implementation Blueprint v1.0\n\nThis document defines the calm, structured, orientation-first homepage layer for the existing planner system. It is an additive front-layer, not a rebuild. All existing planner pages and logic remain intact.\n\nCore Design Intent\n\nTone: Relaxed, creative, open.\nEmotional Effect: Structured stillness.\nFunction: Orientation before execution.\nRule: One continuous vertical layout. No collapsible sections above the fold.\n\nHomepage Structure (Top to Bottom)\n\n1. NORTH STAR (Locked Section)\n\nAnchoring Sentence (locked, editable only during scheduled review):\n\n\"I finish my life in peace — no debt left behind, no burden passed forward, living comfortably enough to create and care for myself.\"\n\nPractical Bullet Conditions (locked):\n\n• No consumer debt.\n\n• Housing path resolved and documented.\n\n• Home simplified and document-ready.\n\n• Income baseline stable with protected creative time.\n\n2. 90-DAY GATE (Current Season)\n\nHeader format: By [Insert Date]\n\n• Housing decision path chosen.\n\n• Debt strategy documented and active.\n\n• Minimum viable home clear established.\n\n3. THIS WEEK (Maximum 3 Commitments)\n\nOnly 1–3 commitments allowed. Each must have a clear 'done' definition.\n\nExample placeholders:\n\n• [Commitment 1]\n\n• [Commitment 2]\n\n• [Commitment 3]\n\n4. TODAY (One Lever Only)\n\nSingle action that advances one weekly commitment. No additional task lists visible on homepage.\n\nNavigation Rules\n\nAll deeper planner pages remain intact.\nA simple 'Home' link is added to each deeper page.\nHomepage remains the browser default start page.\nNo metrics, widgets, progress bars, or dashboards added.\n\nVisual Tone Guidelines\n\nBackground: Warm cream or soft neutral.\nText: Dark slate or charcoal (not pure black).\nAccent hierarchy:\n• Deep muted teal for North Star.\n• Warm clay/amber for 90-Day Gate.\n• Soft sage or gray-blue for Weekly.\n• Subtle highlight for Today.\nTypography: Soft serif for headings; clean sans-serif for body.\n\nGuardrails\n\n• Homepage must fit on one screen without scrolling.\n• North Star text remains locked except during scheduled review.\n• No new sections added without revisiting structure intentionally.\n• This page serves orientation, not tracking.";
 
 const DEFAULT_DOMAINS = ["Work","Financial","Home","Health","Personal","Tentative"];
 
-/* === planner-test safeguards === */
-const APP_FLAVOR = "planner-test";
-const DEFAULT_TEST_GIST_ID = "4364e296d9592d9953ce71ee346a2766";
+/* === storage migration helpers === */
+const APP_FLAVOR = "planner-main";
+const LEGACY_STORE_KEY = "planner-test.data.v1";
+const LEGACY_SYNC_KEY  = "planner-test.sync.v1";
+const LEGACY_AUTO_PULL_SESSION_KEY = "planner.autoPulled.v1";
 
-function ensureTestDefaults() {
+function migrateLegacyStorageKeys() {
   try {
-    let cfg = null;
-    const raw = localStorage.getItem("planner.sync.v1");
-    if (raw) {
-      try { cfg = JSON.parse(raw); } catch(e) { cfg = {}; }
-    } else {
-      cfg = {};
+    if (!localStorage.getItem(STORE_KEY)) {
+      const legacy = localStorage.getItem(LEGACY_STORE_KEY);
+      if (legacy) localStorage.setItem(STORE_KEY, legacy);
     }
-    if (!cfg.gistId) cfg.gistId = DEFAULT_TEST_GIST_ID;
-    localStorage.setItem("planner.sync.v1", JSON.stringify(cfg));
-  } catch(e) {}
-}
-
-function injectTestRibbon(){
+  } catch (e) {}
   try {
-    if (document.getElementById("testRibbon")) return;
-    const d = document.createElement("div");
-    d.id = "testRibbon";
-    d.textContent = "TEST MODE";
-    document.body.appendChild(d);
-  } catch(e) {}
+    if (!localStorage.getItem(SYNC_KEY)) {
+      const legacy = localStorage.getItem(LEGACY_SYNC_KEY);
+      if (legacy) localStorage.setItem(SYNC_KEY, legacy);
+    }
+  } catch (e) {}
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  ensureTestDefaults();
-  injectTestRibbon();
+  migrateLegacyStorageKeys();
 });
-/* === end planner-test safeguards === */
+/* === end storage migration helpers === */
 
 console.log('Planner build', BUILD_VERSION);
 
@@ -100,9 +92,9 @@ window.addEventListener("error", (ev)=>{ dbgAddError(ev.error || ev.message || "
 window.addEventListener("unhandledrejection", (ev)=>{ dbgAddError(ev.reason || "promise rejection"); });
 
 // --- Storage keys ---
-const STORE_KEY = "planner-test.data.v1";
-const SYNC_KEY  = "planner-test.sync.v1";
-const AUTO_PULL_SESSION_KEY = "planner.autoPulled.v1";
+const STORE_KEY = "planner-main.data.v1";
+const SYNC_KEY  = "planner-main.sync.v1";
+const AUTO_PULL_SESSION_KEY = "planner-main.autoPulled.v1";
 const GIST_FILENAME = "planner-data.json";
 
 function nowIso(){ return new Date().toISOString(); }
@@ -302,6 +294,11 @@ function loadState(){
     if(!st.inbox) st.inbox = [];
     if(!st.threads) st.threads = [];
     if(!st.weekly) st.weekly = { slot1:null, slot2:null, weekOf:null };
+    if(st.weeklySlots && typeof st.weeklySlots === "object") {
+      if(!st.weekly.slot1 && st.weeklySlots.slot1) st.weekly.slot1 = st.weeklySlots.slot1;
+      if(!st.weekly.slot2 && st.weeklySlots.slot2) st.weekly.slot2 = st.weeklySlots.slot2;
+      delete st.weeklySlots;
+    }
     st.lifeMap = normalizeLifeMap(st.lifeMap);
     if(!st.incomeMap) st.incomeMap = { startDate:null };
     if(!st.trinkets) st.trinkets = [];
@@ -1297,6 +1294,7 @@ function initLifeMap(){
 
   const horizons = ["week","month","quarter"];
   const domains  = st.lifeMap.domains;
+  const attachShowAll = Object.create(null);
 
   function threadStatusBadge(status){
     const s = (status||"active").toLowerCase();
@@ -1307,38 +1305,71 @@ function initLifeMap(){
   }
 
   function threadLinksHtml(g){
-    const ids = Array.isArray(g.linkedThreadIds) ? g.linkedThreadIds : [];
+    const ids = Array.isArray(g.linkedThreadIds)
+      ? g.linkedThreadIds.map(String)
+      : (g.threadId ? [String(g.threadId)] : []);
     if(!ids.length) return '';
-    const threads = ids.map(id => st.threads.find(t => String(t.id)===String(id))).filter(t => t && t.status !== "archived");
+    const threads = ids
+      .map(id => st.threads.find(t => String(t.id)===String(id)))
+      .filter(t => t && t.status !== "archived");
     if(!threads.length) return '';
     const pills = threads.map(t=>{
       const badge = threadStatusBadge(t.status);
-      return `<button class="thread-link-pill" type="button" data-open-thread="${escapeAttr(String(t.id))}" title="Open thread: ${escapeAttr(t.title)}">`
+      return `<div class="thread-link-chip">`
+        + `<button class="thread-link-pill" type="button" data-open-thread="${escapeAttr(String(t.id))}" title="Open thread: ${escapeAttr(t.title)}">`
         + `<span class="tlp-icon">🧵</span>`
+        + `<span class="tlp-title">${escapeHtml(t.title||"Untitled thread")}</span>`
         + `<span class="tlp-status ${badge.cls}">${badge.label}</span>`
-        + `</button>`;
+        + `</button>`
+        + `<button class="thread-unlink-btn" type="button" data-unlink-thread="${escapeAttr(String(g.id))}" data-thread-id="${escapeAttr(String(t.id))}" title="Remove linked thread: ${escapeAttr(t.title)}" aria-label="Remove linked thread: ${escapeAttr(t.title)}">×</button>`
+        + `</div>`;
     }).join("");
     return `<div class="thread-links-row">${pills}</div>`;
   }
 
-  // FIX: Added domain parameter, default "— None —", filter threads by domain
-  function attachThreadPickerHtml(g, domain){
-    const ids = new Set(Array.isArray(g.linkedThreadIds) ? g.linkedThreadIds.map(String) : []);
+  function attachableThreadsForGoal(g, domain, showAll){
+    const ids = new Set(
+      Array.isArray(g.linkedThreadIds)
+        ? g.linkedThreadIds.map(String)
+        : (g.threadId ? [String(g.threadId)] : [])
+    );
     const domainNorm = (domain||"").trim().toLowerCase();
-    const options = st.threads
-      .filter(t=>t.status!=="archived" && !ids.has(String(t.id)) && (domainNorm ? (t.domain||"").trim().toLowerCase()===domainNorm : true))
-      .map(t=>`<option value="${escapeAttr(String(t.id))}">${escapeHtml(t.title)}</option>`)
+    const list = st.threads
+      .filter(t=>t.status!=="archived" && !ids.has(String(t.id)))
+      .filter(t=> showAll ? true : (domainNorm ? (t.domain||"").trim().toLowerCase()===domainNorm : true))
+      .slice();
+    list.sort((a,b)=> String(a.title||"").localeCompare(String(b.title||""), undefined, { sensitivity:"base" }));
+    return list;
+  }
+
+  function attachThreadPickerHtml(g, domain){
+    const goalId = String(g.id);
+    const showAll = !!attachShowAll[goalId];
+    const sameDomainThreads = attachableThreadsForGoal(g, domain, false);
+    const allThreads = attachableThreadsForGoal(g, domain, true);
+    const visibleThreads = showAll ? allThreads : sameDomainThreads;
+    const options = visibleThreads
+      .map(t=>`<option value="${escapeAttr(String(t.id))}">${escapeHtml(t.title)}${showAll && (t.domain||"") ? ` — ${escapeHtml(t.domain)}` : ""}</option>`)
       .join("");
-    if(!options) return '';
+
+    const helper = !showAll && !sameDomainThreads.length && allThreads.length
+      ? `<div class="small attach-thread-helper">No same-domain threads available. Turn on <strong>Show all threads</strong> to see ${allThreads.length} other thread${allThreads.length===1?"":"s"}.</div>`
+      : (!allThreads.length ? `<div class="small attach-thread-helper">No available threads to attach yet.</div>` : ``);
+
     return `
-      <div style="margin-top:8px">
+      <div class="attach-thread-box">
         <label class="small">Attach existing thread</label>
+        <label class="small attach-thread-toggle">
+          <input type="checkbox" data-show-all-threads="${escapeAttr(goalId)}" ${showAll?"checked":""}>
+          Show all threads
+        </label>
+        ${helper}
         <div class="row" style="gap:8px">
-          <select data-attach-thread-select="${escapeAttr(g.id)}">
+          <select data-attach-thread-select="${escapeAttr(goalId)}" ${visibleThreads.length?"":"disabled"}>
             <option value="">— None —</option>
             ${options}
           </select>
-          <button class="btn" type="button" data-attach-thread="${escapeAttr(g.id)}">Attach</button>
+          <button class="btn" type="button" data-attach-thread="${escapeAttr(goalId)}" ${visibleThreads.length?"":"disabled"}>Attach</button>
         </div>
       </div>
     `;
@@ -1692,6 +1723,35 @@ function initLifeMap(){
       });
     });
 
+    root.querySelectorAll("[data-show-all-threads]").forEach(chk=>{
+      chk.addEventListener("change", ()=>{
+        const goalId = chk.getAttribute("data-show-all-threads");
+        attachShowAll[String(goalId)] = !!chk.checked;
+        render();
+      });
+    });
+
+    root.querySelectorAll("[data-unlink-thread]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const goalId = btn.getAttribute("data-unlink-thread");
+        const tid = btn.getAttribute("data-thread-id");
+        let g = null;
+        for(const hk of horizons){
+          for(const d of domains){
+            g = findGoal(hk, d, goalId);
+            if(g) break;
+          }
+          if(g) break;
+        }
+        if(!g) return;
+        const before = Array.isArray(g.linkedThreadIds) ? g.linkedThreadIds.map(String) : [];
+        g.linkedThreadIds = before.filter(id => String(id)!==String(tid));
+        g.updatedAt = nowIso();
+        saveState(st); renderFooter(st); render();
+        toast("Thread link removed.");
+      });
+    });
+
     // Attach existing thread to goal
     root.querySelectorAll("[data-attach-thread]").forEach(btn=>{
       btn.addEventListener("click", ()=>{
@@ -1901,8 +1961,8 @@ function initMorningMap(){
   const slot1El = document.getElementById('slot1');
   const slot2El = document.getElementById('slot2');
   const mvdEl   = document.getElementById('mvtThread');
-  if(slot1El) slot1El.value = st.weeklySlots?.slot1 || '';
-  if(slot2El) slot2El.value = st.weeklySlots?.slot2 || '';
+  if(slot1El) slot1El.value = st.weekly?.slot1 || '';
+  if(slot2El) slot2El.value = st.weekly?.slot2 || '';
   if(mvdEl)   mvdEl.value   = st.meta.mvtThreadId   || '';
 
   const updatePreview = ()=>{
@@ -1917,9 +1977,9 @@ function initMorningMap(){
   document.getElementById('mmScratchSave')?.addEventListener('click',()=>{ st.meta.morningScratch = document.getElementById('mmScratch').value; saveState(st); toast('Saved'); });
   document.getElementById('sparkSave')?.addEventListener('click',()=>{ st.meta.sparkNotes = document.getElementById('sparkNotes').value; saveState(st); toast('Saved'); });
   document.getElementById('slotsSave')?.addEventListener('click',()=>{
-    st.weeklySlots = st.weeklySlots || {};
-    st.weeklySlots.slot1 = document.getElementById('slot1').value;
-    st.weeklySlots.slot2 = document.getElementById('slot2').value;
+    st.weekly = st.weekly || { slot1:null, slot2:null, weekOf:null };
+    st.weekly.slot1 = document.getElementById('slot1').value || null;
+    st.weekly.slot2 = document.getElementById('slot2').value || null;
     saveState(st); toast('Saved');
   });
   document.getElementById('igSave')?.addEventListener('click',()=>{
