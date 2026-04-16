@@ -266,11 +266,11 @@ function defaultState(){
     trinkets: [],
     longView: {
       objectives: [
-        { id:"debt",     label:"No consumer debt",                goals:["","",""] },
-        { id:"housing",  label:"Clear housing path",              goals:["","",""] },
-        { id:"income",   label:"Sustainable, sufficient income",  goals:["","",""] },
-        { id:"creative", label:"Time and space for creative work",goals:["","",""] },
-        { id:"health",   label:"Health managed deliberately",     goals:["","",""] },
+        { id:"debt",     label:"No consumer debt",                goals:["","",""], linkedThreadIdsByGoal:[[],[],[]] },
+        { id:"housing",  label:"Clear housing path",              goals:["","",""], linkedThreadIdsByGoal:[[],[],[]] },
+        { id:"income",   label:"Sustainable, sufficient income",  goals:["","",""], linkedThreadIdsByGoal:[[],[],[]] },
+        { id:"creative", label:"Time and space for creative work",goals:["","",""], linkedThreadIdsByGoal:[[],[],[]] },
+        { id:"health",   label:"Health managed deliberately",     goals:["","",""], linkedThreadIdsByGoal:[[],[],[]] },
       ]
     }
   };
@@ -283,6 +283,10 @@ function normalizeStatus(s){
   if(v.includes("archiv")) return "archived";
   if(v.includes("done") || v.includes("complete")) return "archived";
   return s;
+}
+
+function uniqueStringArray(arr){
+  return Array.from(new Set((Array.isArray(arr) ? arr : []).filter(v => v!==null && v!==undefined && String(v).trim()!=="").map(v => String(v))));
 }
 
 function loadState(){
@@ -331,19 +335,33 @@ function loadState(){
     }
     if(!st.longView) st.longView = {
       objectives: [
-        { id:"debt",      label:"No consumer debt",                goals:["","",""] },
-        { id:"housing",   label:"Clear housing path",              goals:["","",""] },
-        { id:"income",    label:"Sustainable, sufficient income",  goals:["","",""] },
-        { id:"creative",  label:"Time and space for creative work",goals:["","",""] },
-        { id:"health",    label:"Health managed deliberately",     goals:["","",""] },
-        { id:"tentative", label:"Tentative",                       goals:["","",""] },
+        { id:"debt",      label:"No consumer debt",                goals:["","",""], linkedThreadIdsByGoal:[[],[],[]] },
+        { id:"housing",   label:"Clear housing path",              goals:["","",""], linkedThreadIdsByGoal:[[],[],[]] },
+        { id:"income",    label:"Sustainable, sufficient income",  goals:["","",""], linkedThreadIdsByGoal:[[],[],[]] },
+        { id:"creative",  label:"Time and space for creative work",goals:["","",""], linkedThreadIdsByGoal:[[],[],[]] },
+        { id:"health",    label:"Health managed deliberately",     goals:["","",""], linkedThreadIdsByGoal:[[],[],[]] },
+        { id:"tentative", label:"Tentative",                       goals:["","",""], linkedThreadIdsByGoal:[[],[],[]] },
       ]
     };
     // Add tentative objective if missing
     if(!st.longView.objectives.find(o=>o.id==="tentative")){
-      st.longView.objectives.push({ id:"tentative", label:"Tentative", goals:["","",""] });
+      st.longView.objectives.push({ id:"tentative", label:"Tentative", goals:["","",""], linkedThreadIdsByGoal:[[],[],[]] });
     }
-    st.longView.objectives.forEach(o=>{ while(o.goals.length<3) o.goals.push(""); });
+    st.longView.objectives.forEach(o=>{
+      while(o.goals.length<3) o.goals.push("");
+      if(!Array.isArray(o.linkedThreadIdsByGoal)) o.linkedThreadIdsByGoal = [];
+      while(o.linkedThreadIdsByGoal.length<o.goals.length) o.linkedThreadIdsByGoal.push([]);
+      o.linkedThreadIdsByGoal = o.linkedThreadIdsByGoal.map(ids => uniqueStringArray(Array.isArray(ids) ? ids : (ids ? [ids] : [])));
+      o.linkedThreadIdsByGoal = o.linkedThreadIdsByGoal.map((ids, idx) => {
+        const existing = ids.filter(tid => st.threads.some(t => String(t.id)===String(tid)));
+        const goalText = String(o.goals[idx] || '').trim().toLowerCase();
+        if(!existing.length && goalText){
+          const exact = st.threads.find(t => (String(t.title || '').trim().toLowerCase() === goalText) && t.status !== 'archived');
+          if(exact) existing.push(String(exact.id));
+        }
+        return uniqueStringArray(existing);
+      });
+    });
     return st;
   }catch(e){
     console.warn("State load failed, resetting", e);
@@ -682,49 +700,108 @@ function initQuickCapture(){
   const trinketDone    = document.getElementById('trinketDone');
   const trinketDoneSec = document.getElementById('trinketDoneSection');
   const trinketClear   = document.getElementById('trinketClearDone');
+  let editingTrinketId = null;
+
+  function trinketRowHtml(t, doneMode=false){
+    const isEditing = String(editingTrinketId) === String(t.id);
+    if(isEditing){
+      return `
+      <div class="trinket-row ${doneMode ? 'is-done' : ''} is-editing">
+        <input class="trinket-toggle-spacer" aria-hidden="true" tabindex="-1"/>
+        <input class="trinket-edit-input" data-trinket-edit-input="${escapeAttr(String(t.id))}" value="${escapeAttr(t.text || '')}" placeholder="Edit trinket..."/>
+        <button class="btn mini" type="button" data-trinket-save="${escapeAttr(String(t.id))}">Save</button>
+        <button class="btn mini" type="button" data-trinket-cancel="${escapeAttr(String(t.id))}">Cancel</button>
+        <button class="btn mini" type="button" data-trinket-del="${escapeAttr(String(t.id))}" style="color:#ef4444">✕</button>
+      </div>`;
+    }
+    return `
+      <div class="trinket-row ${doneMode ? 'is-done' : ''}">
+        <input type="checkbox" ${doneMode ? 'checked' : ''} ${doneMode ? `data-trinket-uncheck="${escapeAttr(String(t.id))}"` : `data-trinket-check="${escapeAttr(String(t.id))}"`} class="trinket-toggle"/>
+        <span class="trinket-text">${escapeHtml(t.text)}</span>
+        <button class="btn mini" type="button" data-trinket-edit="${escapeAttr(String(t.id))}">Edit</button>
+        <button class="btn mini" type="button" data-trinket-del="${escapeAttr(String(t.id))}" style="color:#ef4444">✕</button>
+      </div>`;
+  }
 
   function renderTrinkets(){
     if(!trinketActive) return;
     const active = st.trinkets.filter(t=>t.status==='open');
     const done   = st.trinkets.filter(t=>t.status==='done');
 
-    trinketActive.innerHTML = active.length ? active.map(t=>`
-      <div style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid rgba(0,0,0,.06)">
-        <input type="checkbox" data-trinket-check="${t.id}" style="width:18px;height:18px;cursor:pointer;flex-shrink:0"/>
-        <span style="flex:1; font-size:14px">${escapeHtml(t.text)}</span>
-        <button class="btn mini" data-trinket-del="${t.id}" style="color:#ef4444">✕</button>
-      </div>
-    `).join('') : `<div class="small muted" style="padding:8px 0">No trinkets yet. Add something small.</div>`;
+    trinketActive.innerHTML = active.length
+      ? active.map(t=>trinketRowHtml(t,false)).join('')
+      : `<div class="small muted" style="padding:8px 0">No trinkets yet. Add something small.</div>`;
 
     trinketDoneSec.style.display = done.length ? 'block' : 'none';
-    trinketDone.innerHTML = done.map(t=>`
-      <div style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid rgba(0,0,0,.04); opacity:.6">
-        <input type="checkbox" checked data-trinket-uncheck="${t.id}" style="width:18px;height:18px;cursor:pointer;flex-shrink:0"/>
-        <span style="flex:1; font-size:13px; text-decoration:line-through">${escapeHtml(t.text)}</span>
-        <button class="btn mini" data-trinket-del="${t.id}" style="color:#ef4444">✕</button>
-      </div>
-    `).join('');
+    trinketDone.innerHTML = done.map(t=>trinketRowHtml(t,true)).join('');
 
-    // Check → move to done
     trinketActive.querySelectorAll('[data-trinket-check]').forEach(cb=>{
       cb.addEventListener('change', ()=>{
         const t = st.trinkets.find(x=>String(x.id)===cb.getAttribute('data-trinket-check'));
         if(t){ t.status='done'; t.doneAt=nowIso(); saveState(st); renderTrinkets(); }
       });
     });
-    // Uncheck → move back to open
+
     trinketDone.querySelectorAll('[data-trinket-uncheck]').forEach(cb=>{
       cb.addEventListener('change', ()=>{
         const t = st.trinkets.find(x=>String(x.id)===cb.getAttribute('data-trinket-uncheck'));
         if(t){ t.status='open'; delete t.doneAt; saveState(st); renderTrinkets(); }
       });
     });
-    // Delete buttons
+
     document.querySelectorAll('[data-trinket-del]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const id = btn.getAttribute('data-trinket-del');
         st.trinkets = st.trinkets.filter(x=>String(x.id)!==String(id));
+        if(String(editingTrinketId) === String(id)) editingTrinketId = null;
         saveState(st); renderTrinkets();
+      });
+    });
+
+    document.querySelectorAll('[data-trinket-edit]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        editingTrinketId = btn.getAttribute('data-trinket-edit');
+        renderTrinkets();
+        const input = document.querySelector(`[data-trinket-edit-input="${CSS.escape(String(editingTrinketId))}"]`);
+        if(input){ input.focus(); input.select(); }
+      });
+    });
+
+    document.querySelectorAll('[data-trinket-cancel]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        editingTrinketId = null;
+        renderTrinkets();
+      });
+    });
+
+    const saveEdit = (id)=>{
+      const input = document.querySelector(`[data-trinket-edit-input="${CSS.escape(String(id))}"]`);
+      if(!input) return;
+      const text = input.value.trim();
+      if(!text){ input.focus(); return; }
+      const t = st.trinkets.find(x=>String(x.id)===String(id));
+      if(!t) return;
+      t.text = text;
+      t.updatedAt = nowIso();
+      editingTrinketId = null;
+      saveState(st);
+      renderTrinkets();
+    };
+
+    document.querySelectorAll('[data-trinket-save]').forEach(btn=>{
+      btn.addEventListener('click', ()=> saveEdit(btn.getAttribute('data-trinket-save')));
+    });
+
+    document.querySelectorAll('[data-trinket-edit-input]').forEach(input=>{
+      input.addEventListener('keydown', e=>{
+        if(e.key === 'Enter'){
+          e.preventDefault();
+          saveEdit(input.getAttribute('data-trinket-edit-input'));
+        }else if(e.key === 'Escape'){
+          e.preventDefault();
+          editingTrinketId = null;
+          renderTrinkets();
+        }
       });
     });
   }
@@ -735,6 +812,7 @@ function initQuickCapture(){
       if(!text) return;
       st.trinkets.push({ id: uid(), text, status:'open', createdAt: nowIso() });
       trinketInput.value = '';
+      editingTrinketId = null;
       saveState(st); renderTrinkets();
     };
     trinketAdd.addEventListener('click', addTrinket);
@@ -744,6 +822,7 @@ function initQuickCapture(){
   if(trinketClear){
     trinketClear.addEventListener('click', ()=>{
       st.trinkets = st.trinkets.filter(t=>t.status!=='done');
+      if(editingTrinketId && !st.trinkets.some(t=>String(t.id)===String(editingTrinketId))) editingTrinketId = null;
       saveState(st); renderTrinkets();
     });
   }
@@ -2007,6 +2086,134 @@ function initLongView(){
     creative: 'domain-personal',
     health:   'domain-health',
   };
+  const domainMap = {
+    debt: 'Financial', housing: 'Home',
+    income: 'Financial', creative: 'Personal', health: 'Health',
+    tentative: 'Tentative'
+  };
+
+  function norm(v){ return String(v || '').trim().toLowerCase(); }
+  function ensureGoalLinks(obj){
+    if(!Array.isArray(obj.linkedThreadIdsByGoal)) obj.linkedThreadIdsByGoal = [];
+    while(obj.linkedThreadIdsByGoal.length < obj.goals.length) obj.linkedThreadIdsByGoal.push([]);
+    obj.linkedThreadIdsByGoal = obj.linkedThreadIdsByGoal.map(ids => uniqueStringArray(Array.isArray(ids) ? ids : (ids ? [ids] : [])));
+  }
+  function getGoalLinkIds(obj, idx){
+    ensureGoalLinks(obj);
+    return uniqueStringArray(obj.linkedThreadIdsByGoal[idx] || []);
+  }
+  function setGoalLinkIds(obj, idx, ids){
+    ensureGoalLinks(obj);
+    obj.linkedThreadIdsByGoal[idx] = uniqueStringArray(ids).filter(tid => st.threads.some(t => String(t.id) === String(tid)));
+  }
+  function linkedThreadsForGoal(obj, idx){
+    return getGoalLinkIds(obj, idx)
+      .map(tid => st.threads.find(t => String(t.id) === String(tid)))
+      .filter(Boolean);
+  }
+  function exactMatchThread(goalText){
+    const wanted = norm(goalText);
+    if(!wanted) return null;
+    return st.threads.find(t => norm(t.title) === wanted && t.status !== 'archived') || null;
+  }
+  function threadOptionLabel(t, goalText){
+    const exact = norm(t.title) === norm(goalText);
+    const status = t.status && t.status !== 'active' ? ` [${t.status}]` : '';
+    return `${exact ? '↺ ' : ''}${t.title || '(untitled)'}${status}${t.domain ? ` — ${t.domain}` : ''}`;
+  }
+  function threadStatusBadge(status){
+    const s = (status || 'active').toLowerCase();
+    if(s === 'archived' || s === 'done' || s === 'completed') return { label:'✓ Done', cls:'tls-done' };
+    if(s === 'paused') return { label:'⏸ Paused', cls:'tls-paused' };
+    if(s.includes('not started')) return { label:'○ Not started', cls:'tls-idle' };
+    return { label:'● Active', cls:'tls-active' };
+  }
+  function threadChipsHtml(obj, idx){
+    const threads = linkedThreadsForGoal(obj, idx);
+    if(!threads.length) return `<div class="small attach-thread-helper">No thread linked yet.</div>`;
+    const chips = threads.map(t=>{
+      const badge = threadStatusBadge(t.status);
+      return `<div class="thread-link-chip">`
+        + `<button class="thread-link-pill" type="button" data-lv-open-thread="${escapeAttr(String(t.id))}" title="Open thread: ${escapeAttr(t.title || 'Untitled thread')}">`
+        + `<span class="tlp-icon">🧵</span>`
+        + `<span class="tlp-title">${escapeHtml(t.title || 'Untitled thread')}</span>`
+        + `<span class="tlp-status ${badge.cls}">${badge.label}</span>`
+        + `</button>`
+        + `<button class="thread-unlink-btn" type="button" data-lv-unlink-thread="${escapeAttr(obj.id)}" data-idx="${idx}" data-thread-id="${escapeAttr(String(t.id))}" title="Remove linked thread: ${escapeAttr(t.title || 'Untitled thread')}" aria-label="Remove linked thread: ${escapeAttr(t.title || 'Untitled thread')}">×</button>`
+        + `</div>`;
+    }).join('');
+    return `<div class="thread-links-row">${chips}</div>`;
+  }
+  function attachBoxHtml(obj, idx, goalText){
+    const linkedIds = getGoalLinkIds(obj, idx);
+    const availableThreads = st.threads
+      .filter(t => t.status !== 'archived' && !linkedIds.includes(String(t.id)))
+      .sort((a,b)=>{
+        const aExact = norm(a.title) === norm(goalText) ? 0 : 1;
+        const bExact = norm(b.title) === norm(goalText) ? 0 : 1;
+        if(aExact !== bExact) return aExact - bExact;
+        return (a.title || '').localeCompare(b.title || '');
+      });
+    const match = exactMatchThread(goalText);
+    const matchNotLinked = match && !linkedIds.includes(String(match.id));
+    const helper = matchNotLinked
+      ? `<div class="small attach-thread-helper">An existing thread already matches this goal. You can reattach it instead of creating a duplicate.</div>`
+      : (!availableThreads.length ? `<div class="small attach-thread-helper">No other active threads available to attach.</div>` : '');
+    return `
+      <div class="attach-thread-box">
+        <label class="small">Attach existing thread</label>
+        ${helper}
+        <div class="row" style="gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px">
+          <select data-lv-attach-thread-select="${escapeAttr(obj.id)}" data-idx="${idx}" style="flex:1; min-width:220px" ${availableThreads.length ? '' : 'disabled'}>
+            <option value="">Choose thread…</option>
+            ${availableThreads.map(t => `<option value="${escapeAttr(String(t.id))}" ${matchNotLinked && String(match.id)===String(t.id) ? 'selected' : ''}>${escapeHtml(threadOptionLabel(t, goalText))}</option>`).join('')}
+          </select>
+          <button class="btn mini" type="button" data-lv-attach-thread="${escapeAttr(obj.id)}" data-idx="${idx}" ${availableThreads.length ? '' : 'disabled'}>Attach existing</button>
+        </div>
+      </div>`;
+  }
+  function syncLongViewInputsToState(targetObjId){
+    const selector = targetObjId
+      ? `.lv-goal-input[data-obj="${cssEscape(targetObjId)}"]`
+      : '.lv-goal-input';
+    container.querySelectorAll(selector).forEach(inp => {
+      const objId = inp.getAttribute('data-obj');
+      const idx = Number(inp.getAttribute('data-idx'));
+      const obj = st.longView.objectives.find(o => o.id === objId);
+      if(!obj || !Number.isFinite(idx)) return;
+      obj.goals[idx] = inp.value.trim();
+    });
+  }
+
+  function createButtonMeta(obj, idx, goalText){
+    const match = exactMatchThread(goalText);
+    const linkedIds = getGoalLinkIds(obj, idx);
+    if(match && !linkedIds.includes(String(match.id))){
+      return {
+        label: 'Reattach match',
+        title: 'Attach the existing matching thread instead of creating a new one',
+        action: 'reattach',
+        disabled: !goalText.trim(),
+        style: 'background:rgba(59,130,246,.12); color:#1d4ed8; border:1px solid rgba(59,130,246,.32);'
+      };
+    }
+    if(match && linkedIds.includes(String(match.id))){
+      return {
+        label: '✓ Linked',
+        title: 'A matching thread is already linked',
+        action: 'linked',
+        disabled: true,
+        style: 'background:rgba(16,185,129,.15); color:#059669; border:1px solid rgba(16,185,129,.4); cursor:default;'
+      };
+    }
+    return {
+      label: 'Create thread',
+      title: 'Create a new thread in the Registry and link it here',
+      action: 'create',
+      disabled: !goalText.trim(),
+      style: ''
+    };
+  }
 
   function render(){
     const objs = st.longView.objectives;
@@ -2020,10 +2227,10 @@ function initLongView(){
           <div class="domain-strip ${domainColors[obj.id] || ''}"></div>
           <div class="h2" style="font-size:17px; margin-bottom:12px">🎯 ${escapeHtml(obj.label)}</div>
           ${obj.goals.map((g, i) => {
-            const hasThread = g.trim() && st.threads.some(t => t.title === g.trim());
+            const btnMeta = createButtonMeta(obj, i, g || '');
             return `
-            <div class="field" style="margin-bottom:10px">
-              <div class="row" style="gap:8px; align-items:center">
+            <div class="field" style="margin-bottom:14px">
+              <div class="row" style="gap:8px; align-items:center; flex-wrap:wrap">
                 <input
                   type="text"
                   class="lv-goal-input"
@@ -2034,14 +2241,17 @@ function initLongView(){
                   style="flex:1"
                 />
                 <button
-                  class="btn mini lv-make-thread"
+                  class="btn mini lv-create-or-reattach"
                   data-obj="${obj.id}"
                   data-idx="${i}"
-                  title="${hasThread ? 'Thread already exists in Registry' : 'Send to Thread Registry'}"
-                  ${g.trim() ? '' : 'disabled'}
-                  style="${hasThread ? 'background:rgba(16,185,129,.15); color:#059669; border:1px solid rgba(16,185,129,.4); cursor:default;' : ''}"
-                >${hasThread ? '✓ Thread exists' : 'Make Thread'}</button>
+                  data-action="${btnMeta.action}"
+                  title="${escapeAttr(btnMeta.title)}"
+                  ${btnMeta.disabled ? 'disabled' : ''}
+                  style="${btnMeta.style}"
+                >${btnMeta.label}</button>
               </div>
+              ${threadChipsHtml(obj, i)}
+              ${attachBoxHtml(obj, i, g || '')}
             </div>
           `}).join('')}
           <div class="row" style="margin-top:6px">
@@ -2057,34 +2267,76 @@ function initLongView(){
         const objId = btn.getAttribute('data-obj');
         const obj   = st.longView.objectives.find(o => o.id === objId);
         if(!obj) return;
-        container.querySelectorAll(`.lv-goal-input[data-obj="${objId}"]`).forEach(inp => {
-          const idx = Number(inp.getAttribute('data-idx'));
-          obj.goals[idx] = inp.value.trim();
-        });
+        syncLongViewInputsToState(objId);
         saveState(st);
         toast('Saved');
-        render(); // re-render to update disabled state on Make Thread buttons
+        render();
       });
     });
 
-    // Make Thread buttons
-    container.querySelectorAll('.lv-make-thread').forEach(btn => {
+    container.querySelectorAll('[data-lv-open-thread]').forEach(btn => {
       btn.addEventListener('click', () => {
+        const tid = btn.getAttribute('data-lv-open-thread');
+        if(tid) location.href = `thread-registry.html?focusThread=${encodeURIComponent(tid)}`;
+      });
+    });
+
+    container.querySelectorAll('[data-lv-unlink-thread]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const objId = btn.getAttribute('data-lv-unlink-thread');
+        const idx = Number(btn.getAttribute('data-idx'));
+        const tid = btn.getAttribute('data-thread-id');
+        const obj = st.longView.objectives.find(o => o.id === objId);
+        if(!obj) return;
+        setGoalLinkIds(obj, idx, getGoalLinkIds(obj, idx).filter(id => String(id) !== String(tid)));
+        saveState(st);
+        toast('Thread detached from Long View goal.');
+        render();
+      });
+    });
+
+    container.querySelectorAll('[data-lv-attach-thread]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const objId = btn.getAttribute('data-lv-attach-thread');
+        const idx = Number(btn.getAttribute('data-idx'));
+        syncLongViewInputsToState(objId);
+        const obj = st.longView.objectives.find(o => o.id === objId);
+        if(!obj) return;
+        const sel = container.querySelector(`[data-lv-attach-thread-select="${cssEscape(objId)}"][data-idx="${idx}"]`);
+        const tid = sel?.value;
+        if(!tid) { toast('Choose a thread first.'); return; }
+        setGoalLinkIds(obj, idx, getGoalLinkIds(obj, idx).concat([tid]));
+        saveState(st);
+        toast('Existing thread attached.');
+        render();
+      });
+    });
+
+    container.querySelectorAll('.lv-create-or-reattach').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if(btn.disabled) return;
         const objId = btn.getAttribute('data-obj');
         const idx   = Number(btn.getAttribute('data-idx'));
+        syncLongViewInputsToState(objId);
         const obj   = st.longView.objectives.find(o => o.id === objId);
         if(!obj) return;
-        const goalText = obj.goals[idx];
+        const goalText = String(obj.goals[idx] || '').trim();
         if(!goalText) return;
-        // Prevent duplicate threads
-        if(st.threads.some(t => t.title === goalText.trim())){ toast('A thread for this goal already exists.'); return; }
-        const domainMap = {
-          debt: 'Financial', housing: 'Home',
-          income: 'Financial', creative: 'Personal', health: 'Health',
-          tentative: 'Tentative'
-        };
+        const match = exactMatchThread(goalText);
+        const linkedIds = getGoalLinkIds(obj, idx);
+        if(match && !linkedIds.includes(String(match.id))){
+          setGoalLinkIds(obj, idx, linkedIds.concat([match.id]));
+          saveState(st);
+          toast('Existing matching thread reattached.');
+          render();
+          return;
+        }
+        if(match && linkedIds.includes(String(match.id))){
+          toast('That matching thread is already linked here.');
+          return;
+        }
         const now = nowIso();
-        st.threads.push({
+        const thread = {
           id: uid(),
           title: goalText,
           status: 'active',
@@ -2093,9 +2345,11 @@ function initLongView(){
           notes: `Created from Long View objective: ${obj.label}`,
           createdAt: now,
           updatedAt: now,
-        });
+        };
+        st.threads.push(thread);
+        setGoalLinkIds(obj, idx, linkedIds.concat([thread.id]));
         saveState(st);
-        toast('Thread created in Thread Registry.');
+        toast('Thread created in Thread Registry and linked here.');
         render();
       });
     });
