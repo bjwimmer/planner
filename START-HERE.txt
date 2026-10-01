@@ -1,0 +1,22 @@
+Planner v56 — clean start
+
+1. Update your planner's app files with the contents of this planner-main folder.
+2. Open the updated planner and check that the version badge says v56.
+3. Click Import and choose Planner-clean-slate.json from this package.
+4. Start in Long View. Add an objective, choose its domain, and enter a goal.
+5. Create a Registry thread for new work, or attach an existing one.
+6. Use the Registry to write a next action and schedule the work on the Life Map.
+7. Use Sync > Push when you want the new state sent to your other devices.
+
+The clean JSON has no old entries or history. Your original uploaded backup
+remains the separate reference and recovery copy. Importing the clean file
+replaces the data in the browser where you import it.
+
+This revision makes Long View objectives and goal slots editable. Removing
+an objective or goal keeps its linked threads in the Registry. The Map's
+sections are retained with empty content so we can review them next.
+
+Checks: JavaScript syntax; stored-data and UI-handler checks for a blank start,
+objective/goal editing, thread creation, domains, link preservation, reload
+persistence, and compatibility with the original backup. A full browser and
+visual check was unavailable in this execution environment.

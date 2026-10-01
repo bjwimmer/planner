@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "meta": {
+    "createdAt": "2026-09-29T19:47:49.855Z",
+    "updatedAt": "2026-09-29T19:47:49.855Z",
+    "title": "Planner",
+    "northStarText": "",
+    "systemNotesText": "",
+    "ignitionIntent": "",
+    "ignitionFirstMove": "",
+    "ignitionTimebox": "10",
+    "morningScratch": "",
+    "sparkNotes": "",
+    "mvtThreadId": ""
+  },
+  "threads": [],
+  "goals": [],
+  "captures": [],
+  "incomeMap": {
+    "startDate": null
+  },
+  "longView": {
+    "objectives": []
+  },
+  "inbox": [],
+  "weekly": {
+    "slot1": null,
+    "slot2": null,
+    "weekOf": null
+  },
+  "lifeMap": {
+    "version": 2,
+    "domains": [
+      "Work",
+      "Financial",
+      "Home",
+      "Health",
+      "Personal",
+      "Tentative"
+    ],
+    "defaultUrgency": "medium",
+    "horizons": {
+      "week": {
+        "label": "This Week",
+        "domains": {
+          "Work": [],
+          "Financial": [],
+          "Home": [],
+          "Health": [],
+          "Personal": [],
+          "Tentative": []
+        }
+      },
+      "month": {
+        "label": "This Month",
+        "domains": {
+          "Work": [],
+          "Financial": [],
+          "Home": [],
+          "Health": [],
+          "Personal": [],
+          "Tentative": []
+        }
+      },
+      "quarter": {
+        "label": "3 Months",
+        "domains": {
+          "Work": [],
+          "Financial": [],
+          "Home": [],
+          "Health": [],
+          "Personal": [],
+          "Tentative": []
+        }
+      }
+    },
+    "archivedGoals": []
+  },
+  "trinkets": []
+}
