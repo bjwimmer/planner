@@ -1,0 +1,2497 @@
+const BUILD_VERSION = "v56";
+const DEFAULT_ORIENTATION_TEXT = "Planner Orientation Layer — Implementation Blueprint v1.0\n\nThis document defines the calm, structured, orientation-first homepage layer for the existing planner system. It is an additive front-layer, not a rebuild. All existing planner pages and logic remain intact.\n\nCore Design Intent\n\nTone: Relaxed, creative, open.\nEmotional Effect: Structured stillness.\nFunction: Orientation before execution.\nRule: One continuous vertical layout. No collapsible sections above the fold.\n\nHomepage Structure (Top to Bottom)\n\n1. NORTH STAR (Locked Section)\n\nAnchoring Sentence (locked, editable only during scheduled review):\n\n\"I finish my life in peace — no debt left behind, no burden passed forward, living comfortably enough to create and care for myself.\"\n\nPractical Bullet Conditions (locked):\n\n• No consumer debt.\n\n• Housing path resolved and documented.\n\n• Home simplified and document-ready.\n\n• Income baseline stable with protected creative time.\n\n2. 90-DAY GATE (Current Season)\n\nHeader format: By [Insert Date]\n\n• Housing decision path chosen.\n\n• Debt strategy documented and active.\n\n• Minimum viable home clear established.\n\n3. THIS WEEK (Maximum 3 Commitments)\n\nOnly 1–3 commitments allowed. Each must have a clear 'done' definition.\n\nExample placeholders:\n\n• [Commitment 1]\n\n• [Commitment 2]\n\n• [Commitment 3]\n\n4. TODAY (One Lever Only)\n\nSingle action that advances one weekly commitment. No additional task lists visible on homepage.\n\nNavigation Rules\n\nAll deeper planner pages remain intact.\nA simple 'Home' link is added to each deeper page.\nHomepage remains the browser default start page.\nNo metrics, widgets, progress bars, or dashboards added.\n\nVisual Tone Guidelines\n\nBackground: Warm cream or soft neutral.\nText: Dark slate or charcoal (not pure black).\nAccent hierarchy:\n• Deep muted teal for North Star.\n• Warm clay/amber for 90-Day Gate.\n• Soft sage or gray-blue for Weekly.\n• Subtle highlight for Today.\nTypography: Soft serif for headings; clean sans-serif for body.\n\nGuardrails\n\n• Homepage must fit on one screen without scrolling.\n• North Star text remains locked except during scheduled review.\n• No new sections added without revisiting structure intentionally.\n• This page serves orientation, not tracking.";
+
+const DEFAULT_DOMAINS = ["Work","Financial","Home","Health","Personal","Tentative"];
+
+/* === storage migration helpers === */
+const APP_FLAVOR = "planner-main";
+const LEGACY_STORE_KEY = "planner-test.data.v1";
+const LEGACY_SYNC_KEY  = "planner-test.sync.v1";
+const LEGACY_AUTO_PULL_SESSION_KEY = "planner.autoPulled.v1";
+
+function migrateLegacyStorageKeys() {
+  try {
+    if (!localStorage.getItem(STORE_KEY)) {
+      const legacy = localStorage.getItem(LEGACY_STORE_KEY);
+      if (legacy) localStorage.setItem(STORE_KEY, legacy);
+    }
+  } catch (e) {}
+  try {
+    if (!localStorage.getItem(SYNC_KEY)) {
+      const legacy = localStorage.getItem(LEGACY_SYNC_KEY);
+      if (legacy) localStorage.setItem(SYNC_KEY, legacy);
+    }
+  } catch (e) {}
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  migrateLegacyStorageKeys();
+});
+/* === end storage migration helpers === */
+
+console.log('Planner build', BUILD_VERSION);
+
+function escHtml(s){
+  return String(s ?? '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+function esc(s){ return escHtml(s); }
+
+// --- Navigation ---
+const NAV_ITEMS = [
+  { href: "index.html", label: "Map" },
+  { href: "quick-capture.html", label: "⚡ Quick Capture" },
+  { href: "thread-registry.html", label: "Thread Registry" },
+  { href: "strategic-life-map.html", label: "Strategic Life Map" },
+  { href: "long-view.html", label: "🔭 Long View" },
+  { href: "how-this-works.html", label: "How This Works" },
+];
+
+function ensureTopbarNav(){
+  try{
+    const nav = document.querySelector(".topbar .nav");
+    if(!nav) return;
+    nav.innerHTML = NAV_ITEMS.map(it => `<a data-nav href="${it.href}">${escHtml(it.label)}</a>`).join("");
+    const here = (location.pathname.split("/").pop() || "index.html").toLowerCase();
+    nav.querySelectorAll("a[data-nav]").forEach(a=>{
+      const href = (a.getAttribute("href")||"").toLowerCase();
+      if(href===here) a.classList.add("active");
+    });
+  }catch(e){}
+}
+
+// --- Debug ---
+window.__plannerDebug = window.__plannerDebug || {
+  build: BUILD_VERSION, page: null, inits: {}, errors: [], scriptSrc: [],
+};
+
+function dbgRefresh(){
+  try{
+    window.__plannerDebug.build = BUILD_VERSION;
+    window.__plannerDebug.page = (document.body.getAttribute("data-page")||"").toLowerCase();
+    window.__plannerDebug.scriptSrc = [...document.scripts].map(s=>s.src).filter(Boolean);
+    const badge = document.querySelector("[data-build]");
+    if(badge) badge.textContent = BUILD_VERSION;
+  }catch(e){}
+}
+function dbgMarkInit(name){
+  try{ window.__plannerDebug.inits[name] = (new Date()).toISOString(); }catch(e){}
+}
+function dbgAddError(err){
+  try{
+    const msg = typeof err === "string" ? err : (err && err.message) ? err.message : String(err);
+    window.__plannerDebug.errors.push({ t: (new Date()).toISOString(), msg });
+    window.__plannerDebug.errors = window.__plannerDebug.errors.slice(-10);
+  }catch(e){}
+}
+window.addEventListener("error", (ev)=>{ dbgAddError(ev.error || ev.message || "error"); });
+window.addEventListener("unhandledrejection", (ev)=>{ dbgAddError(ev.reason || "promise rejection"); });
+
+// --- Storage keys ---
+const STORE_KEY = "planner-main.data.v1";
+const SYNC_KEY  = "planner-main.sync.v1";
+const AUTO_PULL_SESSION_KEY = "planner-main.autoPulled.v1";
+const GIST_FILENAME = "planner-data.json";
+
+function nowIso(){ return new Date().toISOString(); }
+function uid(){ return Math.random().toString(16).slice(2) + "-" + Date.now().toString(16); }
+
+// --- Toast ---
+function toast(msg, ms=1800){
+  try{
+    let t = document.getElementById('__toast');
+    if(!t){
+      t = document.createElement('div');
+      t.id = '__toast';
+      t.style.cssText = 'position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 20px;border-radius:999px;font-size:13px;z-index:99999;pointer-events:none;opacity:0;transition:opacity .2s';
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.opacity = '1';
+    clearTimeout(t.__to);
+    t.__to = setTimeout(()=>{ t.style.opacity='0'; }, ms);
+  }catch(e){}
+}
+
+// --- Life Map defaults ---
+function defaultLifeMap(){
+  const domains = DEFAULT_DOMAINS.slice();
+  const emptyDomainsObj = ()=> Object.fromEntries(domains.map(d=>[d, []]));
+  const lm = {
+    version: 2,
+    domains,
+    defaultUrgency: "medium",
+    horizons: {
+      week:   { label: "This Week",   domains: emptyDomainsObj() },
+      month:  { label: "This Month",  domains: emptyDomainsObj() },
+      quarter:{ label: "3 Months",    domains: emptyDomainsObj() }
+    }
+  };
+
+  return lm;
+}
+
+function ensureLifeMapSchema(st){
+  if(!st.lifeMap){ st.lifeMap = defaultLifeMap(); return; }
+  if(st.lifeMap && Array.isArray(st.lifeMap.domains) && !st.lifeMap.horizons){
+    const old = st.lifeMap.domains;
+    st.lifeMap = defaultLifeMap();
+    old.forEach(d=>{
+      const name = (d.name||"").toLowerCase();
+      const notes = (d.notes||"").trim();
+      if(!notes) return;
+      const mapTo = name.includes("health") ? "Health"
+        : (name.includes("home") ? "Home"
+        : (name.includes("work") ? "Work"
+        : (name.includes("income")||name.includes("work") ? "Income"
+        : (name.includes("fin") ? "Financial" : null))));
+      if(mapTo){
+        st.lifeMap.horizons.quarter.domains[mapTo].unshift({
+          id: uid(), title: "Imported notes", notes, urgency:"medium",
+          createdAt: nowIso(), updatedAt: nowIso(), linkedThreadIds:[]
+        });
+      }
+    });
+    return;
+  }
+  if(!st.lifeMap.version || st.lifeMap.version < 2){
+    const fresh = defaultLifeMap();
+    st.lifeMap = { ...fresh, ...st.lifeMap, version: 2 };
+  }
+  if(!st.lifeMap.horizons){ st.lifeMap.horizons = defaultLifeMap().horizons; }
+  if(!st.lifeMap.domains){ st.lifeMap.domains = DEFAULT_DOMAINS.slice(); }
+  const domains = st.lifeMap.domains;
+  const ensureDomains = (h)=>{
+    if(!h.domains) h.domains = {};
+    domains.forEach(d=>{ if(!Array.isArray(h.domains[d])) h.domains[d]=[]; });
+  };
+  ensureDomains(st.lifeMap.horizons.week ||= {label:"This Week", domains:{}});
+  ensureDomains(st.lifeMap.horizons.month ||= {label:"This Month", domains:{}});
+  ensureDomains(st.lifeMap.horizons.quarter ||= {label:"3 Months", domains:{}});
+}
+
+function normalizeLifeMap(lm){
+  if(!lm || typeof lm !== 'object') return defaultLifeMap();
+  if(lm.horizons && typeof lm.horizons === 'object'){
+    if(lm.horizons.threeMonths && !lm.horizons.quarter){
+      lm.horizons.quarter = lm.horizons.threeMonths;
+      delete lm.horizons.threeMonths;
+    }
+    if(!lm.domains) lm.domains = DEFAULT_DOMAINS.slice();
+    if(Array.isArray(lm.domains)){
+      lm.domains = lm.domains
+        .map(d => (typeof d === 'string') ? d : (d?.name || d?.title || d?.domain || ""))
+        .map(s => String(s||"").trim())
+        .filter(Boolean);
+    }
+    if(!lm.defaultUrgency) lm.defaultUrgency = "medium";
+    const ensureH = (key, title) => {
+      if(!lm.horizons[key] || typeof lm.horizons[key] !== 'object') lm.horizons[key] = { label: title, domains: {} };
+      if(!lm.horizons[key].label) lm.horizons[key].label = title;
+      if(!lm.horizons[key].domains || typeof lm.horizons[key].domains !== 'object') lm.horizons[key].domains = {};
+    };
+    ensureH('week', 'This Week');
+    ensureH('month', 'This Month');
+    ensureH('quarter', '3 Months');
+    const horizonKeys = ['week','month','quarter'];
+    lm.domains.forEach(domainName=>{
+      horizonKeys.forEach(hk=>{
+        if(!Array.isArray(lm.horizons[hk].domains[domainName])) lm.horizons[hk].domains[domainName] = [];
+      });
+    });
+    return lm;
+  }
+  if(lm.domains && !Array.isArray(lm.domains) && typeof lm.domains === 'object' && !lm.horizons){
+    const fresh = defaultLifeMap();
+    fresh.horizons.quarter.domains = Object.assign(fresh.horizons.quarter.domains, lm.domains);
+    return fresh;
+  }
+  if(Array.isArray(lm.domains) && !lm.horizons){
+    const fresh = defaultLifeMap();
+    try{
+      lm.domains.forEach(d=>{
+        const name = d.name || d.title || d.domain;
+        if(!name) return;
+        const normName = String(name).trim();
+        const list = d.goals || d.items || [];
+        if(!Array.isArray(list)) return;
+        list.forEach(g=>{
+          const title = g.title || g.name;
+          if(!title) return;
+          const notesArr = g.notes || g.sub || g.items || [];
+          const notes = Array.isArray(notesArr) ? notesArr.join("\n") : (g.notesText || "");
+          const now = nowIso();
+          fresh.horizons.quarter.domains[normName] = fresh.horizons.quarter.domains[normName] || [];
+          fresh.horizons.quarter.domains[normName].push({ id: uid(), title: String(title), notes: notes||"", urgency: (g.urgency||"medium"), createdAt: now, updatedAt: now, linkedThreadIds: [] });
+        });
+      });
+      return fresh;
+    }catch(e){ return fresh; }
+  }
+  return defaultLifeMap();
+}
+
+function defaultState(){
+  return {
+    meta: { createdAt: nowIso(), updatedAt: nowIso(), title: "Planner" },
+    inbox: [],
+    threads: [],
+    weekly: { slot1: null, slot2: null, weekOf: null },
+    lifeMap: defaultLifeMap(),
+    incomeMap: { startDate: null },
+    trinkets: [],
+    longView: { objectives: [] }
+  };
+}
+
+function normalizeStatus(s){
+  const v = (s ?? "").toString().trim().toLowerCase();
+  if(!v) return "active";
+  if(v === "archive" || v === "archived" || v === "done" || v === "completed" || v === "complete") return "archived";
+  if(v.includes("archiv")) return "archived";
+  if(v.includes("done") || v.includes("complete")) return "archived";
+  return s;
+}
+
+function uniqueStringArray(arr){
+  return Array.from(new Set((Array.isArray(arr) ? arr : []).filter(v => v!==null && v!==undefined && String(v).trim()!=="").map(v => String(v))));
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return defaultState();
+    const st = JSON.parse(raw);
+    if(!st.meta) st.meta = { createdAt: nowIso(), updatedAt: nowIso(), title:"Planner" };
+    if(!st.inbox) st.inbox = [];
+    if(!st.threads) st.threads = [];
+    if(!st.weekly) st.weekly = { slot1:null, slot2:null, weekOf:null };
+    if(st.weeklySlots && typeof st.weeklySlots === "object") {
+      if(!st.weekly.slot1 && st.weeklySlots.slot1) st.weekly.slot1 = st.weeklySlots.slot1;
+      if(!st.weekly.slot2 && st.weeklySlots.slot2) st.weekly.slot2 = st.weeklySlots.slot2;
+      delete st.weeklySlots;
+    }
+    st.lifeMap = normalizeLifeMap(st.lifeMap);
+    if(!st.incomeMap) st.incomeMap = { startDate:null };
+    if(!st.trinkets) st.trinkets = [];
+    if(!st.lifeMap.archivedGoals) st.lifeMap.archivedGoals = [];
+
+    // Migrate: merge Income domain into Financial
+    if(st.lifeMap && st.lifeMap.horizons){
+      const hKeys = ['week','month','quarter'];
+      for(const hk of hKeys){
+        const hDomains = st.lifeMap.horizons[hk]?.domains;
+        if(!hDomains) continue;
+        if(hDomains['Income'] && hDomains['Income'].length){
+          if(!hDomains['Financial']) hDomains['Financial'] = [];
+          hDomains['Financial'].push(...hDomains['Income']);
+        }
+        delete hDomains['Income'];
+        // Add Tentative if missing
+        if(!hDomains['Tentative']) hDomains['Tentative'] = [];
+      }
+      // Remove Income from domains list, replace with Tentative if needed
+      if(Array.isArray(st.lifeMap.domains)){
+        st.lifeMap.domains = st.lifeMap.domains.filter(d=>d!=='Income');
+        if(!st.lifeMap.domains.includes('Tentative')) st.lifeMap.domains.push('Tentative');
+        if(!st.lifeMap.domains.includes('Financial')) st.lifeMap.domains.push('Financial');
+      }
+    }
+    // Migrate threads: Income domain → Financial
+    if(Array.isArray(st.threads)){
+      st.threads.forEach(t=>{ if(t.domain==='Income') t.domain='Financial'; });
+    }
+    if(!st.longView) st.longView = { objectives: [] };
+    if(!Array.isArray(st.longView.objectives)) st.longView.objectives = [];
+    st.longView.objectives.forEach(o=>{
+      if(!Array.isArray(o.goals)) o.goals = [];
+      if(!Array.isArray(o.linkedThreadIdsByGoal)) o.linkedThreadIdsByGoal = [];
+      while(o.linkedThreadIdsByGoal.length<o.goals.length) o.linkedThreadIdsByGoal.push([]);
+      o.linkedThreadIdsByGoal = o.linkedThreadIdsByGoal.map(ids => uniqueStringArray(Array.isArray(ids) ? ids : (ids ? [ids] : [])));
+      o.linkedThreadIdsByGoal = o.linkedThreadIdsByGoal.map((ids, idx) => {
+        const existing = ids.filter(tid => st.threads.some(t => String(t.id)===String(tid)));
+        const goalText = String(o.goals[idx] || '').trim().toLowerCase();
+        if(!existing.length && goalText){
+          const exact = st.threads.find(t => (String(t.title || '').trim().toLowerCase() === goalText) && t.status !== 'archived');
+          if(exact) existing.push(String(exact.id));
+        }
+        return uniqueStringArray(existing);
+      });
+    });
+    return st;
+  }catch(e){
+    console.warn("State load failed, resetting", e);
+    return defaultState();
+  }
+}
+
+function saveState(st){
+  st.meta.updatedAt = nowIso();
+  localStorage.setItem(STORE_KEY, JSON.stringify(st));
+}
+
+function setActiveNav(){
+  const path = (location.pathname.split("/").pop() || "index.html").toLowerCase();
+  document.querySelectorAll("[data-nav]").forEach(a=>{
+    const href = (a.getAttribute("href") || "").toLowerCase();
+    if(href.endsWith(path)) a.classList.add("active");
+  });
+}
+
+function renderFooter(st){
+  const el = document.querySelector("[data-footer]");
+  if(!el) return;
+  el.innerHTML = `
+    <div>Stored locally in your browser · <span class="mono">${STORE_KEY}</span></div>
+    <div>Last saved: <span class="mono">${new Date(st.meta.updatedAt).toLocaleString()}</span></div>
+  `;
+}
+
+function escapeHtml(s){
+  return String(s ?? "").replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[m]));
+}
+function escapeAttr(s){ return escapeHtml(s); }
+
+function mondayOf(date){
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1) - day;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0,0,0,0);
+  return d;
+}
+
+function ymd(d){
+  const pad=n=>String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
+
+function weekNumberFromStart(startYmd){
+  if(!startYmd) return null;
+  const start = new Date(startYmd + "T00:00:00");
+  const today = new Date();
+  const ms = today - start;
+  const weeks = Math.floor(ms / (1000*60*60*24*7)) + 1;
+  return weeks < 1 ? 1 : weeks;
+}
+
+function daysSince(dateStr){
+  if(!dateStr) return 999;
+  const dt = new Date(dateStr);
+  const now = new Date();
+  return (now - dt)/(1000*60*60*24);
+}
+
+// --- Export / Import ---
+function exportJson(){
+  const st = loadState();
+  ensureLifeMapSchema(st);
+  saveState(st);
+  const blob = new Blob([JSON.stringify(st,null,2)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "planner-backup.json";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function importJsonFromFile(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      try{
+        const parsed = JSON.parse(reader.result);
+        saveState(parsed);
+        resolve(parsed);
+      }catch(e){ reject(e); }
+    };
+    reader.onerror = reject;
+    reader.readAsText(file);
+  });
+}
+
+// --- Sync ---
+function loadSync(){
+  try{ return JSON.parse(localStorage.getItem(SYNC_KEY) || "null"); }
+  catch{ return null; }
+}
+function saveSync(cfg){ localStorage.setItem(SYNC_KEY, JSON.stringify(cfg)); }
+function clearSync(){
+  localStorage.removeItem(SYNC_KEY);
+  sessionStorage.removeItem(AUTO_PULL_SESSION_KEY);
+}
+function isConnected(){
+  const cfg = loadSync();
+  return !!(cfg?.gistId && cfg?.token);
+}
+function parseIso(s){
+  const t = Date.parse(s || "");
+  return Number.isFinite(t) ? t : 0;
+}
+
+async function githubFetchGist(gistId, token){
+  const res = await fetch(`https://api.github.com/gists/${gistId}`, {
+    headers: { "Authorization": `token ${token}`, "Accept": "application/vnd.github+json" }
+  });
+  if(!res.ok) throw new Error(`Pull failed: ${res.status}`);
+  return await res.json();
+}
+
+function findPlannerFile(gistJson){
+  const files = Object.values(gistJson.files || {});
+  if(!files.length) return null;
+  return files.find(f => (f.filename || "") === GIST_FILENAME) || null;
+}
+
+async function githubPull({force=false} = {}){
+  const cfg = loadSync();
+  if(!cfg?.gistId || !cfg?.token) throw new Error("Not connected. Add Gist ID and token in Sync.");
+  const gist = await githubFetchGist(cfg.gistId, cfg.token);
+  const file = findPlannerFile(gist);
+  if(!file?.content) throw new Error(`${GIST_FILENAME} not found in this Gist.`);
+  const remoteState = JSON.parse(file.content);
+  const localState = loadState();
+  const remoteUpdated = parseIso(remoteState?.meta?.updatedAt);
+  const localUpdated  = parseIso(localState?.meta?.updatedAt);
+  if(force || remoteUpdated > localUpdated){
+    saveState(remoteState);
+    return {applied:true, reason: force ? "forced" : "remote-newer", remoteUpdated, localUpdated};
+  }
+  return {applied:false, reason:"local-newer-or-equal", remoteUpdated, localUpdated};
+}
+
+async function githubPush(){
+  const cfg = loadSync();
+  if(!cfg?.gistId || !cfg?.token) throw new Error("Not connected. Add Gist ID and token in Sync.");
+  const st = loadState();
+  ensureLifeMapSchema(st);
+  saveState(st);
+  const res = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
+    method: "PATCH",
+    headers: { "Authorization": `token ${cfg.token}`, "Accept": "application/vnd.github+json" },
+    body: JSON.stringify({ files: { [GIST_FILENAME]: { content: JSON.stringify(st, null, 2) } } })
+  });
+  if(!res.ok) throw new Error(`Push failed: ${res.status}`);
+  return true;
+}
+
+function setSyncIndicator(){
+  const el = document.querySelector("[data-sync-indicator]");
+  if(!el) return;
+  if(isConnected()){
+    el.textContent = "● Connected";
+    el.style.color = "var(--good)";
+  } else {
+    el.textContent = "● Not connected";
+    el.style.color = "var(--muted)";
+  }
+}
+
+// --- Modal wiring ---
+function openModal(){
+  const back = document.getElementById("syncModalBackdrop");
+  if(back) back.style.display = "flex";
+}
+function closeModal(){
+  const back = document.getElementById("syncModalBackdrop");
+  if(back) back.style.display = "none";
+}
+function wireModal(){
+  const openBtn = document.querySelector("[data-open-sync]");
+  if(openBtn) openBtn.addEventListener("click", openModal);
+  document.querySelectorAll("[data-close-sync]").forEach(b=>b.addEventListener("click", closeModal));
+
+  const cfg = loadSync() || { gistId:"", token:"", autoPull:true };
+  const gistIdEl = document.getElementById("syncGistId");
+  const tokenEl  = document.getElementById("syncToken");
+  const autoEl   = document.getElementById("syncAutoPull");
+  const statusEl = document.getElementById("syncStatus");
+  if(gistIdEl) gistIdEl.value = cfg.gistId || "";
+  if(tokenEl)  tokenEl.value  = cfg.token  || "";
+  if(autoEl)   autoEl.checked = cfg.autoPull !== false;
+
+  const setStatus = (msg)=>{ if(statusEl) statusEl.textContent = msg; };
+
+  const saveBtn  = document.getElementById("syncSave");
+  const pullBtn  = document.getElementById("syncPull");
+  const forceBtn = document.getElementById("syncForcePull");
+  const pushBtn  = document.getElementById("syncPush");
+  const clearBtn = document.getElementById("syncClear");
+
+  if(saveBtn) saveBtn.onclick = ()=>{
+    saveSync({ gistId:(gistIdEl?.value||"").trim(), token:(tokenEl?.value||"").trim(), autoPull:!!(autoEl?.checked) });
+    setSyncIndicator(); setStatus("Saved.");
+  };
+  if(pullBtn) pullBtn.onclick = async ()=>{
+    setStatus("Pulling…");
+    try{
+      const r = await githubPull({force:false});
+      setStatus(r.applied ? "Pulled (applied remote state)." : "Pulled (kept local — local is newer).");
+      setTimeout(()=>location.reload(), 250);
+    }catch(e){ setStatus(e.message); }
+  };
+  if(forceBtn) forceBtn.onclick = async ()=>{
+    if(!confirm("Force Pull will overwrite local data with the Gist data. Continue?")) return;
+    setStatus("Force pulling…");
+    try{ await githubPull({force:true}); setStatus("Done. Reloading…"); setTimeout(()=>location.reload(), 250); }
+    catch(e){ setStatus(e.message); }
+  };
+  if(pushBtn) pushBtn.onclick = async ()=>{
+    setStatus("Pushing…");
+    try{ await githubPush(); setStatus("Pushed to Gist."); }
+    catch(e){ setStatus(e.message); }
+  };
+  if(clearBtn) clearBtn.onclick = ()=>{
+    if(!confirm("Clear sync settings on this device?")) return;
+    clearSync(); setSyncIndicator(); setStatus("Cleared.");
+  };
+}
+
+async function autoPullIfEnabled(){
+  const cfg = loadSync();
+  if(!(cfg?.gistId && cfg?.token && cfg.autoPull !== false)) return;
+  if(sessionStorage.getItem(AUTO_PULL_SESSION_KEY) === "1") return;
+  sessionStorage.setItem(AUTO_PULL_SESSION_KEY, "1");
+  try{
+    const r = await githubPull({force:false});
+    if(r.applied) setTimeout(()=>location.reload(), 200);
+  }catch(e){ console.warn("Auto-pull failed:", e); }
+}
+
+// --- Common init ---
+function initCommon(){
+  const st = loadState();
+  ensureLifeMapSchema(st);
+  // Persist schema normalization without treating a page visit as an edit.
+  localStorage.setItem(STORE_KEY, JSON.stringify(st));
+  setActiveNav();
+  renderFooter(st);
+  const expBtn = document.querySelector("[data-export]");
+  if(expBtn) expBtn.addEventListener("click", exportJson);
+  const impInput = document.querySelector("[data-import]");
+  if(impInput){
+    impInput.addEventListener("change", async (e)=>{
+      const file = e.target.files?.[0];
+      if(!file) return;
+      try{ await importJsonFromFile(file); location.reload(); }
+      catch(err){ alert("Import failed. Make sure it's a valid backup JSON."); console.error(err); }
+    });
+  }
+  setSyncIndicator();
+  wireModal();
+  autoPullIfEnabled();
+  return st;
+}
+
+// --- Domain color class ---
+function domainClass(domainRaw){
+  const d = (domainRaw || "").trim().toLowerCase();
+  if(!d) return "domain-other";
+  if(d.includes("health")) return "domain-health";
+  if(d.includes("home") || d.includes("house")) return "domain-home";
+  if(d.includes("work") || d.includes("job") || d.includes("career") || d.includes("employ")) return "domain-work";
+  if(d.includes("financial") || d.includes("income") || d.includes("money") || d.includes("revenue") || d.includes("earn")) return "domain-financial";
+  if(d.includes("creative") || d.includes("meaning") || d.includes("writing") || d.includes("art")) return "domain-creative-meaning";
+  if(d.includes("personal") || d.includes("self")) return "domain-personal";
+  return "domain-other";
+}
+
+function cssEscape(s){
+  return (window.CSS && CSS.escape) ? CSS.escape(s) : s.replace(/[^a-zA-Z0-9_\-]/g, "\\$&");
+}
+
+// =============================================================
+// --- Quick Capture ---
+// =============================================================
+function initQuickCapture(){
+  dbgMarkInit('quickCapture');
+  const st = initCommon();
+
+  const form    = document.querySelector("#captureForm");
+  const input   = document.querySelector("#captureText");
+  const list    = document.querySelector("#inboxList");
+  const clearBtn= document.querySelector("#archiveAll");
+
+  function render(){
+    const openItems = st.inbox.filter(i=>i.status!=="archived").sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+    list.innerHTML = openItems.length ? openItems.map(i=>`
+      <div class="item">
+        <strong>${escapeHtml(i.text)}</strong>
+        <div class="meta">
+          <span class="pill">Inbox</span>
+          <span class="mono">${new Date(i.createdAt).toLocaleString()}</span>
+          <button class="btn" data-arch="${i.id}">Archive</button>
+        </div>
+      </div>
+    `).join("") : `<p class="small">Inbox is empty. Nice.</p>`;
+
+    list.querySelectorAll("[data-arch]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-arch");
+        const it = st.inbox.find(x=>String(x.id)===String(id));
+        if(it){ it.status="archived"; saveState(st); renderFooter(st); render(); }
+      });
+    });
+  }
+
+  form.addEventListener("submit",(e)=>{
+    e.preventDefault();
+    const text = input.value.trim();
+    if(!text) return;
+    st.inbox.push({ id: uid(), text, createdAt: nowIso(), status:"open" });
+    input.value="";
+    saveState(st); renderFooter(st); render();
+  });
+
+  clearBtn.addEventListener("click", ()=>{
+    st.inbox.forEach(i=>i.status="archived");
+    saveState(st); renderFooter(st); render();
+  });
+
+  render();
+
+  // --- Trinket List ---
+  const trinketInput   = document.getElementById('trinketInput');
+  const trinketAdd     = document.getElementById('trinketAdd');
+  const trinketActive  = document.getElementById('trinketActive');
+  const trinketDone    = document.getElementById('trinketDone');
+  const trinketDoneSec = document.getElementById('trinketDoneSection');
+  const trinketClear   = document.getElementById('trinketClearDone');
+  let editingTrinketId = null;
+
+  function trinketRowHtml(t, doneMode=false){
+    const isEditing = String(editingTrinketId) === String(t.id);
+    if(isEditing){
+      return `
+      <div class="trinket-row ${doneMode ? 'is-done' : ''} is-editing">
+        <input class="trinket-toggle-spacer" aria-hidden="true" tabindex="-1"/>
+        <input class="trinket-edit-input" data-trinket-edit-input="${escapeAttr(String(t.id))}" value="${escapeAttr(t.text || '')}" placeholder="Edit trinket..."/>
+        <button class="btn mini" type="button" data-trinket-save="${escapeAttr(String(t.id))}">Save</button>
+        <button class="btn mini" type="button" data-trinket-cancel="${escapeAttr(String(t.id))}">Cancel</button>
+        <button class="btn mini" type="button" data-trinket-del="${escapeAttr(String(t.id))}" style="color:#ef4444">✕</button>
+      </div>`;
+    }
+    return `
+      <div class="trinket-row ${doneMode ? 'is-done' : ''}">
+        <input type="checkbox" ${doneMode ? 'checked' : ''} ${doneMode ? `data-trinket-uncheck="${escapeAttr(String(t.id))}"` : `data-trinket-check="${escapeAttr(String(t.id))}"`} class="trinket-toggle"/>
+        <span class="trinket-text">${escapeHtml(t.text)}</span>
+        <button class="btn mini" type="button" data-trinket-edit="${escapeAttr(String(t.id))}">Edit</button>
+        <button class="btn mini" type="button" data-trinket-del="${escapeAttr(String(t.id))}" style="color:#ef4444">✕</button>
+      </div>`;
+  }
+
+  function renderTrinkets(){
+    if(!trinketActive) return;
+    const active = st.trinkets.filter(t=>t.status==='open');
+    const done   = st.trinkets.filter(t=>t.status==='done');
+
+    trinketActive.innerHTML = active.length
+      ? active.map(t=>trinketRowHtml(t,false)).join('')
+      : `<div class="small muted" style="padding:8px 0">No trinkets yet. Add something small.</div>`;
+
+    trinketDoneSec.style.display = done.length ? 'block' : 'none';
+    trinketDone.innerHTML = done.map(t=>trinketRowHtml(t,true)).join('');
+
+    trinketActive.querySelectorAll('[data-trinket-check]').forEach(cb=>{
+      cb.addEventListener('change', ()=>{
+        const t = st.trinkets.find(x=>String(x.id)===cb.getAttribute('data-trinket-check'));
+        if(t){ t.status='done'; t.doneAt=nowIso(); saveState(st); renderTrinkets(); }
+      });
+    });
+
+    trinketDone.querySelectorAll('[data-trinket-uncheck]').forEach(cb=>{
+      cb.addEventListener('change', ()=>{
+        const t = st.trinkets.find(x=>String(x.id)===cb.getAttribute('data-trinket-uncheck'));
+        if(t){ t.status='open'; delete t.doneAt; saveState(st); renderTrinkets(); }
+      });
+    });
+
+    document.querySelectorAll('[data-trinket-del]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.getAttribute('data-trinket-del');
+        st.trinkets = st.trinkets.filter(x=>String(x.id)!==String(id));
+        if(String(editingTrinketId) === String(id)) editingTrinketId = null;
+        saveState(st); renderTrinkets();
+      });
+    });
+
+    document.querySelectorAll('[data-trinket-edit]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        editingTrinketId = btn.getAttribute('data-trinket-edit');
+        renderTrinkets();
+        const input = document.querySelector(`[data-trinket-edit-input="${CSS.escape(String(editingTrinketId))}"]`);
+        if(input){ input.focus(); input.select(); }
+      });
+    });
+
+    document.querySelectorAll('[data-trinket-cancel]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        editingTrinketId = null;
+        renderTrinkets();
+      });
+    });
+
+    const saveEdit = (id)=>{
+      const input = document.querySelector(`[data-trinket-edit-input="${CSS.escape(String(id))}"]`);
+      if(!input) return;
+      const text = input.value.trim();
+      if(!text){ input.focus(); return; }
+      const t = st.trinkets.find(x=>String(x.id)===String(id));
+      if(!t) return;
+      t.text = text;
+      t.updatedAt = nowIso();
+      editingTrinketId = null;
+      saveState(st);
+      renderTrinkets();
+    };
+
+    document.querySelectorAll('[data-trinket-save]').forEach(btn=>{
+      btn.addEventListener('click', ()=> saveEdit(btn.getAttribute('data-trinket-save')));
+    });
+
+    document.querySelectorAll('[data-trinket-edit-input]').forEach(input=>{
+      input.addEventListener('keydown', e=>{
+        if(e.key === 'Enter'){
+          e.preventDefault();
+          saveEdit(input.getAttribute('data-trinket-edit-input'));
+        }else if(e.key === 'Escape'){
+          e.preventDefault();
+          editingTrinketId = null;
+          renderTrinkets();
+        }
+      });
+    });
+  }
+
+  if(trinketAdd){
+    const addTrinket = ()=>{
+      const text = trinketInput.value.trim();
+      if(!text) return;
+      st.trinkets.push({ id: uid(), text, status:'open', createdAt: nowIso() });
+      trinketInput.value = '';
+      editingTrinketId = null;
+      saveState(st); renderTrinkets();
+    };
+    trinketAdd.addEventListener('click', addTrinket);
+    trinketInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addTrinket(); }});
+  }
+
+  if(trinketClear){
+    trinketClear.addEventListener('click', ()=>{
+      st.trinkets = st.trinkets.filter(t=>t.status!=='done');
+      if(editingTrinketId && !st.trinkets.some(t=>String(t.id)===String(editingTrinketId))) editingTrinketId = null;
+      saveState(st); renderTrinkets();
+    });
+  }
+
+  renderTrinkets();
+}
+
+// =============================================================
+// --- Thread Registry ---
+// =============================================================
+function initThreadRegistry(){
+  dbgMarkInit('threadRegistry');
+  const st = initCommon();
+
+  const inboxEl   = document.querySelector("#registryInbox");
+  const threadsEl = document.querySelector("#threadsList");
+  const form      = document.querySelector("#newThreadForm");
+
+  // Delegated archive handler — attached once, survives re-renders
+  threadsEl.addEventListener("click", e=>{
+    const btn = e.target.closest("[data-archive-thread]");
+    if(!btn) return;
+    const id = btn.getAttribute("data-archive-thread");
+    const th = st.threads.find(x=>String(x.id)===String(id));
+    if(!th) return;
+    th.status = "archived";
+    th.updatedAt = nowIso();
+    if(String(st.weekly?.slot1)===String(id)) st.weekly.slot1=null;
+    if(String(st.weekly?.slot2)===String(id)) st.weekly.slot2=null;
+    saveState(st); renderFooter(st); render();
+    toast("Thread archived.");
+  });
+  const focusThreadId = new URLSearchParams(location.search).get("focusThread");
+
+  // Focus glow style
+  (function(){
+    const styleId = "threadRegistryFocusGlow";
+    if(document.getElementById(styleId)) return;
+    const s = document.createElement("style");
+    s.id = styleId;
+    s.textContent = `.focus-glow { outline: 3px solid rgba(255,180,0,.55); border-radius:14px; }`;
+    document.head.appendChild(s);
+  })();
+
+  // Add thread button state
+  const addBtn    = form ? form.querySelector('button[type="submit"]') : null;
+  const titleInput= document.querySelector("#tTitle");
+  function updateAddBtn(){
+    if(!addBtn || !titleInput) return;
+    const ok = (titleInput.value || "").trim().length > 0;
+    addBtn.disabled = !ok;
+    addBtn.style.opacity = ok ? "1" : ".55";
+    addBtn.style.cursor  = ok ? "pointer" : "not-allowed";
+  }
+  if(titleInput){ titleInput.addEventListener("input", updateAddBtn); updateAddBtn(); }
+
+  // Domain dropdown
+  const domainSelect = document.querySelector("#tDomain");
+  if(domainSelect){
+    const domains = (st.lifeMap && Array.isArray(st.lifeMap.domains) && st.lifeMap.domains.length)
+      ? st.lifeMap.domains : DEFAULT_DOMAINS;
+    domainSelect.innerHTML = `<option value="">— none —</option>` +
+      domains.map(d => `<option value="${escapeAttr(d)}">${escapeHtml(d)}</option>`).join("");
+  }
+
+  const slot1Sel = document.querySelector("#slot1");
+  const slot2Sel = document.querySelector("#slot2");
+  const weekOfEl = document.querySelector("#weekOf");
+
+  function ensureWeekOf(){
+    const mon  = mondayOf(new Date());
+    const monY = ymd(mon);
+    if(st.weekly.weekOf !== monY){ st.weekly.weekOf = monY; saveState(st); }
+    if(weekOfEl) weekOfEl.textContent = mon.toLocaleDateString(undefined, {weekday:"long", year:"numeric", month:"short", day:"numeric"});
+  }
+
+  function threadOptionsHtml(selectedId){
+    return [`<option value="">— none —</option>`].concat(
+      st.threads
+        .filter(t=>t.status!=="archived")
+        .sort((a,b)=>a.title.localeCompare(b.title))
+        .map(t=>`<option value="${t.id}" ${String(t.id)===String(selectedId)?"selected":""}>${escapeHtml(t.title)}</option>`)
+    ).join("");
+  }
+
+  function renderWeeklySlots(){
+    ensureWeekOf();
+    if(slot1Sel){ slot1Sel.innerHTML = threadOptionsHtml(st.weekly.slot1); slot1Sel.onchange = ()=>{ st.weekly.slot1 = slot1Sel.value || null; saveState(st); renderFooter(st); render(); }; }
+    if(slot2Sel){ slot2Sel.innerHTML = threadOptionsHtml(st.weekly.slot2); slot2Sel.onchange = ()=>{ st.weekly.slot2 = slot2Sel.value || null; saveState(st); renderFooter(st); render(); }; }
+  }
+
+  function renderInbox(){
+    const openItems = st.inbox.filter(i=>i.status!=="archived").sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+    inboxEl.innerHTML = openItems.length ? openItems.map(i=>`
+      <div class="item">
+        <strong>${escapeHtml(i.text)}</strong>
+        <div class="meta">
+          <span class="pill">Inbox</span>
+          <span class="mono">${new Date(i.createdAt).toLocaleString()}</span>
+          <button class="btn good" data-mkthread="${i.id}">Make thread</button>
+          <button class="btn" data-append="${i.id}">Append to…</button>
+          <button class="btn" data-arch="${i.id}">Archive</button>
+        </div>
+      </div>
+    `).join("") : `<p class="small">Inbox is empty.</p>`;
+
+    inboxEl.querySelectorAll("[data-arch]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-arch");
+        const it = st.inbox.find(x=>String(x.id)===String(id));
+        if(it){ it.status="archived"; saveState(st); renderFooter(st); render(); }
+      });
+    });
+    inboxEl.querySelectorAll("[data-mkthread]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-mkthread");
+        const it = st.inbox.find(x=>String(x.id)===String(id));
+        if(!it) return;
+        st.threads.push({ id: uid(), title: it.text.slice(0,80), status:"active", domain:"", nextAction:"", notes: it.text, createdAt: nowIso(), updatedAt: nowIso() });
+        it.status="archived";
+        saveState(st); renderFooter(st); render();
+      });
+    });
+    inboxEl.querySelectorAll("[data-append]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-append");
+        const it = st.inbox.find(x=>String(x.id)===String(id));
+        if(!it) return;
+        const pick = prompt("Paste the exact thread title to append to:");
+        if(!pick) return;
+        const th = st.threads.find(t=>t.title.toLowerCase()===pick.toLowerCase() && t.status!=="archived");
+        if(!th){ alert("No matching thread found."); return; }
+        th.notes = (th.notes ? th.notes + "\n\n" : "") + it.text;
+        th.updatedAt = nowIso();
+        it.status="archived";
+        saveState(st); renderFooter(st); render();
+      });
+    });
+  }
+
+  function threadBacklinks(threadId){
+    const links = [];
+    const lm = st.lifeMap;
+    if(!lm || !lm.horizons) return links;
+    for(const [hKey,h] of Object.entries(lm.horizons)){
+      for(const domain of (lm.domains||[])){
+        const list = h.domains?.[domain] || [];
+        for(const g of list){
+          const ids = Array.isArray(g.linkedThreadIds) ? g.linkedThreadIds : (g.threadId?[g.threadId]:[]);
+          if(ids.map(String).includes(String(threadId))){
+            links.push({ hKey, hLabel: h.label, domain, goalId: g.id, goalTitle: g.title });
+          }
+        }
+      }
+    }
+    return links;
+  }
+
+  function renderThreads(){
+    const showArchived = document.querySelector('[data-toggle-archived]')?.checked || false;
+    const activeThreads = st.threads
+      .filter(t=>t.status!=="archived")
+      .sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
+    const archivedThreads = st.threads
+      .filter(t=>t.status==="archived")
+      .sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
+
+    threadsEl.innerHTML = activeThreads.length ? activeThreads.map(t=>{
+      const domainPillColor = t.domain ? ` domain-pill" data-domain="${escapeAttr((t.domain||"").toLowerCase())}` : ``;
+      const links = threadBacklinks(t.id);
+
+      // Single consolidated schedule pill
+      const horizonStyles = {
+        week:    { bg:"#bbf7d0", color:"#166534", label:"\uD83D\uDCC5 This Week" },
+        month:   { bg:"#bfdbfe", color:"#1e40af", label:"\uD83D\uDDD3 This Month" },
+        quarter: { bg:"#e9d5ff", color:"#6b21a8", label:"\uD83D\uDD2D 3 Months" },
+      };
+      const topLink = links.length ? links[0] : null;
+      const schedStyle = topLink ? (horizonStyles[topLink.hKey] || horizonStyles.week) : null;
+      const pill = topLink
+        ? `<a href="strategic-life-map.html?focusGoal=${encodeURIComponent(topLink.goalId)}" style="text-decoration:none"><span class="pill" style="background:${schedStyle.bg};color:${schedStyle.color};border:none;font-weight:600">${schedStyle.label}</span></a>`
+        : `<span class="pill" style="background:#fef08a;color:#713f12;border:1px solid #facc15;font-weight:700">⏳ Unscheduled</span>`;
+
+      const backlinksHtml = "";
+
+      return `
+        <div class="item ${domainClass(t.domain)}" data-thread-card="${t.id}" id="thread-${t.id}">
+          <div class="domain-strip"></div>
+          <strong>${escapeHtml(t.title)}</strong>
+          <div class="meta">
+            ${pill}
+            ${t.domain ? `<span class="pill domain-pill" data-domain="${escapeAttr((t.domain||"").toLowerCase())}">${escapeHtml(t.domain)}</span>` : ""}
+            <span class="mono">Updated: ${new Date(t.updatedAt).toLocaleString()}</span>
+          </div>
+          ${backlinksHtml}
+          <div class="grid" style="margin-top:10px; align-items:flex-start; grid-template-columns: 1fr auto">
+            <div>
+              <label>Next micro-action (5–20 min)</label>
+              <textarea data-next="${t.id}" placeholder="Example: Open file and write 5 bullets" rows="2" style="min-height:60px;resize:vertical">${escapeHtml(t.nextAction || "")}</textarea>
+            </div>
+            <div>
+              <label style="min-height:36px; display:flex; align-items:flex-start">Status</label>
+              <select data-status="${t.id}">
+                <option value="active"   ${t.status==="active"  ?"selected":""}>active</option>
+                <option value="paused"   ${t.status==="paused"  ?"selected":""}>paused</option>
+                <option value="done"     ${t.status==="done"    ?"selected":""}>done</option>
+                <option value="archived" ${t.status==="archived"?"selected":""}>archived</option>
+              </select>
+            </div>
+          </div>
+          <label style="margin-top:10px">Notes</label>
+          <textarea data-notes="${t.id}" placeholder="Context, constraints, next thoughts…">${escapeHtml(t.notes || "")}</textarea>
+          <div class="row" style="margin-top:10px">
+            <button class="btn primary" data-save="${t.id}">Save</button>
+            <button class="btn"         data-edit="${t.id}">Edit</button>
+            <button class="btn"         data-schedule="${t.id}">Schedule</button>
+            <button class="btn warn"    data-copy="${t.id}">Copy micro-action</button>
+            <button class="btn" style="background:rgba(100,116,139,.12);color:#475569;border:1px solid rgba(100,116,139,.25)" data-archive-thread="${t.id}">Archive</button>
+            <button class="btn bad"     data-delete="${t.id}">Delete</button>
+          </div>
+        </div>
+      `;
+    }).join("") : `<p class="small">No threads yet. Create one below, or process the inbox.</p>`;
+
+    // Focus scroll
+    if(focusThreadId){
+      const el = threadsEl.querySelector(`[data-thread-card="${cssEscape(focusThreadId)}"]`);
+      if(el){ el.scrollIntoView({behavior:"smooth", block:"center"}); el.classList.add("focus-glow"); setTimeout(()=>el.classList.remove("focus-glow"), 1800); }
+    }
+
+    threadsEl.querySelectorAll("[data-save]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id  = btn.getAttribute("data-save");
+        const th  = st.threads.find(x=>String(x.id)===String(id));
+        if(!th) return;
+        th.nextAction = document.querySelector(`[data-next="${id}"]`)?.value.trim() ?? "";
+        th.notes      = document.querySelector(`[data-notes="${id}"]`)?.value.trim() ?? "";
+        th.status     = document.querySelector(`[data-status="${id}"]`)?.value ?? "active";
+        th.updatedAt  = nowIso();
+        if(th.status==="archived"){
+          if(String(st.weekly.slot1)===String(id)) st.weekly.slot1=null;
+          if(String(st.weekly.slot2)===String(id)) st.weekly.slot2=null;
+        }
+        saveState(st); renderFooter(st); render();
+      });
+    });
+
+    threadsEl.querySelectorAll("[data-schedule]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-schedule");
+        const th = st.threads.find(x=>String(x.id)===String(id));
+        if(!th) return;
+
+        // Build popup
+        const existing = document.getElementById("__schedulePop");
+        if(existing) existing.remove();
+
+        const pop = document.createElement("div");
+        pop.id = "__schedulePop";
+        pop.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.45);z-index:99998;display:flex;align-items:center;justify-content:center";
+        pop.innerHTML = `
+          <div style="background:#fff;border-radius:16px;padding:28px 32px;min-width:280px;box-shadow:0 8px 40px rgba(0,0,0,.18)">
+            <div style="font-weight:700;font-size:16px;margin-bottom:6px">Schedule thread</div>
+            <div style="font-size:13px;color:#64748b;margin-bottom:18px">${escapeHtml(th.title)}</div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <button class="btn primary" data-sch-horizon="week"    style="text-align:left">📅 This Week <span style="font-size:11px;opacity:.7;margin-left:6px">— also adds to weekly slot</span></button>
+              <button class="btn"         data-sch-horizon="month"   style="text-align:left">🗓 This Month</button>
+              <button class="btn"         data-sch-horizon="quarter" style="text-align:left">🔭 3 Months</button>
+            </div>
+            <div style="margin-top:16px"><button class="btn" id="__schCancel">Cancel</button></div>
+          </div>
+        `;
+        document.body.appendChild(pop);
+
+        document.getElementById("__schCancel").onclick = ()=>pop.remove();
+        pop.addEventListener("click", e=>{ if(e.target===pop) pop.remove(); });
+
+        pop.querySelectorAll("[data-sch-horizon]").forEach(hBtn=>{
+          hBtn.addEventListener("click", ()=>{
+            const hKey = hBtn.getAttribute("data-sch-horizon");
+            const domain = th.domain || st.lifeMap.domains[0];
+            const horizonKeys = ["week","month","quarter"];
+
+            // Add to weekly slot if This Week
+            if(hKey==="week"){
+              if(!st.weekly.slot1) st.weekly.slot1=id;
+              else if(!st.weekly.slot2) st.weekly.slot2=id;
+              else st.weekly.slot2=id;
+            }
+
+            // First: sweep all horizons and collect ALL linked goals for this thread
+            const allLinked = [];
+            for(const hk of horizonKeys){
+              for(const d of (st.lifeMap.domains||[])){
+                const list = st.lifeMap.horizons[hk]?.domains?.[d] || [];
+                list.forEach((g,i)=>{
+                  const ids = Array.isArray(g.linkedThreadIds) ? g.linkedThreadIds : (g.threadId ? [g.threadId] : []);
+                  if(ids.map(String).includes(String(id))){
+                    allLinked.push({g, hk, d, i});
+                  }
+                });
+              }
+            }
+
+            // Remove all existing linked goals (we'll re-add to the target horizon)
+            const goalToKeep = allLinked.length > 0 ? allLinked[0].g : null;
+            for(const {hk, d, g} of allLinked){
+              const list = st.lifeMap.horizons[hk].domains[d];
+              const idx = list.findIndex(x=>String(x.id)===String(g.id));
+              if(idx >= 0) list.splice(idx, 1);
+            }
+
+            // Place goal in target horizon
+            const toList = st.lifeMap.horizons[hKey].domains;
+            if(!toList[domain]) toList[domain] = [];
+            if(goalToKeep){
+              goalToKeep.updatedAt = nowIso();
+              toList[domain].unshift(goalToKeep);
+            } else {
+              const now = nowIso();
+              toList[domain].unshift({
+                id: uid(), title: th.title, notes: "", urgency: "medium",
+                createdAt: now, updatedAt: now, linkedThreadIds: [id]
+              });
+            }
+
+            saveState(st);
+            pop.remove();
+            toast(`Scheduled → ${st.lifeMap.horizons[hKey].label}`);
+            renderFooter(st); render();
+          });
+        });
+      });
+    });
+
+    threadsEl.querySelectorAll("[data-copy]").forEach(btn=>{
+      btn.addEventListener("click", async ()=>{
+        const id = btn.getAttribute("data-copy");
+        const th = st.threads.find(x=>String(x.id)===String(id));
+        if(!th) return;
+        try{ await navigator.clipboard.writeText(th.nextAction || ""); toast("Micro-action copied."); }
+        catch{ alert("Couldn't access clipboard in this browser."); }
+      });
+    });
+
+    threadsEl.querySelectorAll("[data-delete]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-delete");
+        const th = st.threads.find(x=>String(x.id)===String(id));
+        if(!th) return;
+        if(!confirm(`Delete thread "${th.title || "this thread"}"?\n\nThis cannot be undone.`)) return;
+        st.threads = st.threads.filter(x=>String(x.id)!==String(id));
+        if(st.weekly?.slot1===id) st.weekly.slot1=null;
+        if(st.weekly?.slot2===id) st.weekly.slot2=null;
+        saveState(st); render();
+      });
+    });
+
+    threadsEl.querySelectorAll("[data-edit]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-edit");
+        const th = st.threads.find(x=>String(x.id)===String(id));
+        if(!th) return;
+        
+        // Pre-fill form with thread data
+        document.getElementById("tTitle").value = th.title || "";
+        document.getElementById("tDomain").value = th.domain || "";
+        document.getElementById("tNext").value = th.nextAction || "";
+        
+        // Update button state and text
+        updateAddBtn();
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if(submitBtn) submitBtn.textContent = "Update thread";
+        
+        // Scroll to form
+        document.getElementById("tTitle").scrollIntoView({behavior: "smooth", block: "center"});
+        document.getElementById("tTitle").focus();
+        
+        // Store ID so we know we're editing
+        form.dataset.editingId = id;
+      });
+    });
+  }
+
+  function renderArchivedThreads(){
+    const section = document.getElementById('archivedThreadsSection');
+    if(!section) return;
+
+    const archivedThreads = st.threads
+      .filter(t=>t.status==="archived")
+      .sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+
+    if(!archivedThreads.length){ section.innerHTML = ''; return; }
+
+    // Preserve open/closed state across re-renders
+    const wasOpen = section.querySelector('#archivedThreadList')?.style.display === 'block';
+
+    section.innerHTML = `
+      <div class="card">
+        <button id="toggleArchivedThreads" style="background:none;border:none;cursor:pointer;font-size:13px;font-weight:600;color:#64748b;padding:4px 0;display:flex;align-items:center;gap:6px;width:100%">
+          <span id="archivedThreadChevron">${wasOpen ? '▼' : '▶'}</span> Archived Threads (${archivedThreads.length})
+        </button>
+        <div id="archivedThreadList" style="display:${wasOpen ? 'block' : 'none'}; margin-top:12px">
+          ${archivedThreads.map(t=>`
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(248,250,252,.9);border:1px solid rgba(215,222,233,.8);border-radius:12px;margin-bottom:8px">
+              <div style="flex:1">
+                <div style="font-weight:700;font-size:14px;color:#334155">${escapeHtml(t.title)}</div>
+                <div style="font-size:11px;color:#94a3b8;margin-top:2px">
+                  ${t.domain ? `<span style="margin-right:8px">${escapeHtml(t.domain)}</span>` : ''}
+                  archived ${new Date(t.updatedAt||t.createdAt).toLocaleDateString()}
+                </div>
+              </div>
+              <button class="btn mini" data-restore-thread="${t.id}" style="color:#059669;border-color:rgba(5,150,105,.3)">Restore</button>
+              <button class="btn mini bad" data-perm-delete-thread="${t.id}">Delete</button>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+    // Toggle
+    section.querySelector('#toggleArchivedThreads')?.addEventListener('click', ()=>{
+      const list = section.querySelector('#archivedThreadList');
+      const chev = section.querySelector('#archivedThreadChevron');
+      if(list.style.display === 'none'){ list.style.display='block'; chev.textContent='▼'; }
+      else { list.style.display='none'; chev.textContent='▶'; }
+    });
+
+    // Restore thread
+    section.querySelectorAll('[data-restore-thread]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.getAttribute('data-restore-thread');
+        const t = st.threads.find(x=>String(x.id)===String(id));
+        if(t){ t.status='active'; t.updatedAt=nowIso(); saveState(st); renderFooter(st); render(); toast('Thread restored.'); }
+      });
+    });
+
+    // Permanently delete thread
+    section.querySelectorAll('[data-perm-delete-thread]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.getAttribute('data-perm-delete-thread');
+        if(!confirm('Permanently delete this thread?')) return;
+        st.threads = st.threads.filter(x=>String(x.id)!==String(id));
+        saveState(st); renderFooter(st); render(); toast('Thread deleted.');
+      });
+    });
+  }
+
+  function render(){
+    renderWeeklySlots();
+    renderInbox();
+    renderThreads();
+    renderArchivedThreads();
+  }
+
+  form.addEventListener("submit",(e)=>{
+    e.preventDefault();
+    const title      = document.getElementById("tTitle").value.trim();
+    const domain     = document.getElementById("tDomain").value.trim();
+    const nextAction = document.getElementById("tNext").value.trim();
+    if(!title) return;
+    
+    // Check if we're editing an existing thread
+    const editingId = form.dataset.editingId;
+    if(editingId){
+      // Update existing thread
+      const th = st.threads.find(x=>String(x.id)===String(editingId));
+      if(th){
+        const oldDomain = th.domain;
+        th.title = title;
+        th.domain = domain;
+        th.nextAction = nextAction;
+        th.updatedAt = nowIso();
+
+        // If domain changed, move any linked goals on the Life Map to the new domain
+        if(oldDomain !== domain && st.lifeMap && st.lifeMap.horizons){
+          const horizonKeys = ["week","month","quarter"];
+          for(const hk of horizonKeys){
+            const horizonDomains = st.lifeMap.horizons[hk]?.domains;
+            if(!horizonDomains) continue;
+            for(const d of Object.keys(horizonDomains)){
+              const list = horizonDomains[d];
+              if(!Array.isArray(list)) continue;
+              const toMove = [];
+              const remaining = [];
+              list.forEach(g => {
+                const ids = Array.isArray(g.linkedThreadIds) ? g.linkedThreadIds : (g.threadId ? [g.threadId] : []);
+                if(ids.map(String).includes(String(editingId))){
+                  toMove.push(g);
+                } else {
+                  remaining.push(g);
+                }
+              });
+              if(toMove.length){
+                horizonDomains[d] = remaining;
+                if(!horizonDomains[domain]) horizonDomains[domain] = [];
+                horizonDomains[domain].push(...toMove);
+              }
+            }
+          }
+        }
+      }
+      delete form.dataset.editingId;
+    } else {
+      // Create new thread
+      st.threads.push({ id: uid(), title, status:"active", domain, nextAction, notes:"", createdAt: nowIso(), updatedAt: nowIso() });
+    }
+    
+    form.reset();
+    
+    // Reset button text
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if(submitBtn) submitBtn.textContent = "Add thread";
+    
+    updateAddBtn();
+    saveState(st); renderFooter(st); render();
+  });
+
+  render();
+}
+
+// =============================================================
+// --- Strategic Life Map ---
+// =============================================================
+function initLifeMap(){
+  dbgMarkInit('lifeMap');
+  const st = initCommon();
+
+  const root = document.querySelector("#lifeMapRoot");
+  if(!root) return;
+
+  const focusGoalId = new URLSearchParams(location.search).get("focusGoal");
+  let focusGoalDone = false;
+
+  // Stripe opacity style
+  (function(){
+    const styleId = "lifeMapStripeOpacity";
+    if(document.getElementById(styleId)) return;
+    const s = document.createElement("style");
+    s.id = styleId;
+    s.textContent = `
+      #lifeMapRoot .domain-block > .domain-strip { opacity:1 !important; }
+      #lifeMapRoot .goal > .domain-strip { opacity:0.45 !important; }
+      .focus-glow { outline:3px solid rgba(255,180,0,.55); border-radius:14px; }
+    `;
+    document.head.appendChild(s);
+  })();
+
+  const horizons = ["week","month","quarter"];
+  const domains  = st.lifeMap.domains;
+  const attachShowAll = Object.create(null);
+
+  function threadStatusBadge(status){
+    const s = (status||"active").toLowerCase();
+    if(s==="archived"||s==="done"||s==="completed") return { label:"✓ Done",       cls:"tls-done"   };
+    if(s==="paused")                                 return { label:"⏸ Paused",     cls:"tls-paused" };
+    if(s.includes("not started"))                    return { label:"○ Not started",cls:"tls-idle"   };
+    return                                                  { label:"● Active",     cls:"tls-active" };
+  }
+
+  function threadLinksHtml(g){
+    const ids = Array.isArray(g.linkedThreadIds)
+      ? g.linkedThreadIds.map(String)
+      : (g.threadId ? [String(g.threadId)] : []);
+    if(!ids.length) return '';
+    const threads = ids
+      .map(id => st.threads.find(t => String(t.id)===String(id)))
+      .filter(t => t && t.status !== "archived");
+    if(!threads.length) return '';
+    const pills = threads.map(t=>{
+      const badge = threadStatusBadge(t.status);
+      return `<div class="thread-link-chip">`
+        + `<button class="thread-link-pill" type="button" data-open-thread="${escapeAttr(String(t.id))}" title="Open thread: ${escapeAttr(t.title)}">`
+        + `<span class="tlp-icon">🧵</span>`
+        + `<span class="tlp-title">${escapeHtml(t.title||"Untitled thread")}</span>`
+        + `<span class="tlp-status ${badge.cls}">${badge.label}</span>`
+        + `</button>`
+        + `<button class="thread-unlink-btn" type="button" data-unlink-thread="${escapeAttr(String(g.id))}" data-thread-id="${escapeAttr(String(t.id))}" title="Remove linked thread: ${escapeAttr(t.title)}" aria-label="Remove linked thread: ${escapeAttr(t.title)}">×</button>`
+        + `</div>`;
+    }).join("");
+    return `<div class="thread-links-row">${pills}</div>`;
+  }
+
+  function attachableThreadsForGoal(g, domain, showAll){
+    const ids = new Set(
+      Array.isArray(g.linkedThreadIds)
+        ? g.linkedThreadIds.map(String)
+        : (g.threadId ? [String(g.threadId)] : [])
+    );
+    const domainNorm = (domain||"").trim().toLowerCase();
+    const list = st.threads
+      .filter(t=>t.status!=="archived" && !ids.has(String(t.id)))
+      .filter(t=> showAll ? true : (domainNorm ? (t.domain||"").trim().toLowerCase()===domainNorm : true))
+      .slice();
+    list.sort((a,b)=> String(a.title||"").localeCompare(String(b.title||""), undefined, { sensitivity:"base" }));
+    return list;
+  }
+
+  function attachThreadPickerHtml(g, domain){
+    const goalId = String(g.id);
+    const showAll = !!attachShowAll[goalId];
+    const sameDomainThreads = attachableThreadsForGoal(g, domain, false);
+    const allThreads = attachableThreadsForGoal(g, domain, true);
+    const visibleThreads = showAll ? allThreads : sameDomainThreads;
+    const options = visibleThreads
+      .map(t=>`<option value="${escapeAttr(String(t.id))}">${escapeHtml(t.title)}${showAll && (t.domain||"") ? ` — ${escapeHtml(t.domain)}` : ""}</option>`)
+      .join("");
+
+    const helper = !showAll && !sameDomainThreads.length && allThreads.length
+      ? `<div class="small attach-thread-helper">No same-domain threads available. Turn on <strong>Show all threads</strong> to see ${allThreads.length} other thread${allThreads.length===1?"":"s"}.</div>`
+      : (!allThreads.length ? `<div class="small attach-thread-helper">No available threads to attach yet.</div>` : ``);
+
+    return `
+      <div class="attach-thread-box">
+        <label class="small">Attach existing thread</label>
+        <label class="small attach-thread-toggle">
+          <input type="checkbox" data-show-all-threads="${escapeAttr(goalId)}" ${showAll?"checked":""}>
+          Show all threads
+        </label>
+        ${helper}
+        <div class="row" style="gap:8px">
+          <select data-attach-thread-select="${escapeAttr(goalId)}" ${visibleThreads.length?"":"disabled"}>
+            <option value="">— None —</option>
+            ${options}
+          </select>
+          <button class="btn" type="button" data-attach-thread="${escapeAttr(goalId)}" ${visibleThreads.length?"":"disabled"}>Attach</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function goalRow(hKey, domain, g){
+    const dClass  = domainClass(domain);
+    const urgency = g.urgency || st.lifeMap.defaultUrgency || "medium";
+    const leftLabel  = hKey==="month"   ? "← Week"    : "← Month";
+    const rightLabel = hKey==="week"    ? "Month →"   : "Quarter →";
+    const leftBtn  = (hKey!=="week")    ? `<button class="btn arrow-btn" data-promote="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}" title="Move to more urgent horizon">${leftLabel}</button>`  : `<span></span>`;
+    const rightBtn = (hKey!=="quarter") ? `<button class="btn arrow-btn" data-demote="${g.id}"  data-h="${hKey}" data-d="${escapeAttr(domain)}" title="Move to less urgent horizon">${rightLabel}</button>` : `<span></span>`;
+    return `
+      <div class="goal ${dClass}" data-goal-card="${g.id}">
+        <div class="domain-strip"></div>
+        <div class="goal-head">
+          <div>
+            <div style="margin-left:4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap">
+              <span style="font-size:10px; font-weight:600; color:#94a3b8; letter-spacing:.8px; text-transform:uppercase">Goal</span>
+              <span class="goal-title-display" data-goal-title="${g.id}" style="font-size:16px; font-weight:800; color:#1e293b">${escapeHtml(g.title||"")}</span>
+              <input class="goal-title-input" data-goal-title-input="${g.id}" value="${escapeHtml(g.title||"")}" style="display:none; font-size:16px; font-weight:800; color:#1e293b; border:1px solid rgba(99,102,241,.4); border-radius:6px; padding:2px 8px; flex:1; min-width:200px"/>
+              <button class="btn mini goal-title-edit" data-edit-title="${g.id}" style="font-size:11px; padding:3px 8px; color:#6366f1; border-color:rgba(99,102,241,.3)">Edit</button>
+              <button class="btn mini goal-title-save" data-save-title="${g.id}" style="display:none; font-size:11px; padding:3px 8px; color:#059669; border-color:rgba(5,150,105,.3)">Save</button>
+              <button class="btn mini goal-title-cancel" data-cancel-title="${g.id}" style="display:none; font-size:11px; padding:3px 8px">Cancel</button>
+            </div>
+            <div class="meta">
+              <span class="pill domain-pill" data-domain="${escapeAttr(domain.toLowerCase())}">${escapeHtml(domain)}</span>
+            </div>
+            ${threadLinksHtml(g)}
+            ${(()=>{ const linked = (g.linkedThreadIds||[]).map(id=>st.threads.find(t=>t.id===id)).filter(t=>t && t.status!=="archived"); const actions = linked.map(t=>t.nextAction).filter(Boolean); return actions.length ? `<div style="margin-top:8px; padding:10px 14px; background:#ffffcc; border-left:4px solid #e5e500; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.08)"><div style="font-size:10px; font-weight:700; color:#334155; letter-spacing:.8px; margin-bottom:4px"><span style="color:#dc2626">⚡</span> NEXT ACTION <span style="color:#dc2626">⚡</span></div><div style="font-size:14px; font-weight:700; color:#0f172a">${escapeHtml(actions[0])}</div></div>` : ""; })()}
+          </div>
+          <div class="row" style="justify-content:flex-end; gap:8px">
+            ${leftBtn}
+            ${rightBtn}
+          </div>
+        </div>
+        <div class="row" style="gap:10px; align-items:flex-start">
+          <div style="flex:1 1 auto">
+            <label>Notes / sub-items</label>
+            <textarea data-notes="${g.id}" placeholder="One per line...">${escapeHtml(g.notes||"")}</textarea>
+          </div>
+          <div style="min-width:180px">
+            <label>Urgency</label>
+            <select data-urgency="${g.id}">
+              <option value="low"    ${urgency==="low"   ?"selected":""}>Low</option>
+              <option value="medium" ${urgency==="medium"?"selected":""}>Medium</option>
+              <option value="high"   ${urgency==="high"  ?"selected":""}>High</option>
+            </select>
+            <div style="height:10px"></div>
+            <button class="btn primary" data-save-goal="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">Save</button>
+            <div style="height:8px"></div>
+            <button class="btn good"    data-thread-from-goal="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">🧵 Create Thread</button>
+            ${attachThreadPickerHtml(g, domain)}
+            <div style="height:8px"></div>
+            <button class="btn" style="background:rgba(100,116,139,.12);color:#475569;border:1px solid rgba(100,116,139,.25)" data-archive-goal="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">Archive</button>
+            <div style="height:6px"></div>
+            <button class="btn bad"     data-delete-goal="${g.id}" data-h="${hKey}" data-d="${escapeAttr(domain)}">Delete</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function findGoal(hKey, domain, id){
+    return (st.lifeMap.horizons[hKey]?.domains?.[domain] || []).find(x=>String(x.id)===String(id));
+  }
+
+  function moveGoal(id, hKey, domain, dir){
+    const order  = ["week","month","quarter"];
+    const idx    = order.indexOf(hKey);
+    const toKey  = dir==="promote" ? order[Math.max(0, idx-1)] : order[Math.min(order.length-1, idx+1)];
+    if(hKey===toKey) return;
+    const fromList = st.lifeMap.horizons[hKey].domains[domain];
+    const i = fromList.findIndex(x=>String(x.id)===String(id));
+    if(i<0) return;
+    const [g] = fromList.splice(i,1);
+    g.updatedAt = nowIso();
+    st.lifeMap.horizons[toKey].domains[domain].unshift(g);
+    saveState(st); renderFooter(st); render();
+  }
+
+  function render(){
+    root.innerHTML = `
+      <div class="horizon-grid">
+        ${horizons.map(hKey=>{
+          const h = st.lifeMap.horizons[hKey];
+          return `
+            <div class="hcol">
+              <div class="hcol-head">
+                <h2>${escapeHtml(h.label)}</h2>
+                <div class="kicker">Domains stay constant. Promote goals forward as they become urgent.</div>
+              </div>
+              ${domains.map(domain=>{
+                const dClass = domainClass(domain);
+                const list   = h.domains[domain] || [];
+                return `
+                  <div class="domain-block ${dClass}">
+                    <div class="domain-strip"></div>
+                    <div class="domain-head">
+                      <div>
+                        <strong>${escapeHtml(domain)}</strong>
+                        <span class="small">${list.length} goal${list.length===1?"":"s"}</span>
+                      </div>
+                      <div class="row" style="gap:8px; justify-content:flex-end">
+                        <input class="mini-input" data-new-title="${hKey}::${escapeAttr(domain)}" placeholder="New goal title…">
+                        <button class="btn primary" data-add-goal="${hKey}" data-d="${escapeAttr(domain)}">Add</button>
+                      </div>
+                    </div>
+                    <div class="goal-list">
+                      ${list.map(g=>goalRow(hKey, domain, g)).join("") || `<div class="small" style="padding:10px 0">No goals yet.</div>`}
+                    </div>
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          `;
+        }).join("")}
+      </div>
+
+      ${(()=>{
+        const archived = st.lifeMap.archivedGoals || [];
+        if(!archived.length) return '';
+        const wasOpen = root.querySelector('#archivedList')?.style.display === 'block';
+        return `
+          <div style="margin-top:24px">
+            <button id="toggleArchive" style="background:none;border:none;cursor:pointer;font-size:13px;font-weight:600;color:#64748b;padding:8px 0;display:flex;align-items:center;gap:6px">
+              <span id="archiveChevron">${wasOpen ? '▼' : '▶'}</span> Archived Goals (${archived.length})
+            </button>
+            <div id="archivedList" style="display:${wasOpen ? 'block' : 'none'}; margin-top:10px">
+              ${archived.map(a=>`
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(248,250,252,.9);border:1px solid rgba(215,222,233,.8);border-radius:12px;margin-bottom:8px">
+                  <div style="flex:1">
+                    <div style="font-weight:700;font-size:14px;color:#334155">${escapeHtml(a.title)}</div>
+                    <div style="font-size:11px;color:#94a3b8;margin-top:2px">${escapeHtml(a.domain)} · ${escapeHtml(a.horizon)} · archived ${new Date(a.archivedAt).toLocaleDateString()}</div>
+                  </div>
+                  <button class="btn mini" data-restore-goal="${a.id}" style="color:#059669;border-color:rgba(5,150,105,.3)">Restore</button>
+                  <button class="btn mini bad" data-perm-delete-goal="${a.id}">Delete</button>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      })()}
+    `;
+
+    // Toggle archive section
+    root.querySelector('#toggleArchive')?.addEventListener('click', ()=>{
+      const list = root.querySelector('#archivedList');
+      const chev = root.querySelector('#archiveChevron');
+      if(list.style.display === 'none'){ list.style.display='block'; chev.textContent='▼'; }
+      else { list.style.display='none'; chev.textContent='▶'; }
+    });
+
+    // Restore goal
+    root.querySelectorAll('[data-restore-goal]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.getAttribute('data-restore-goal');
+        const archived = st.lifeMap.archivedGoals || [];
+        const idx = archived.findIndex(x=>String(x.id)===String(id));
+        if(idx<0) return;
+        const a = archived[idx];
+        // Restore to original horizon/domain if possible, else quarter
+        const hKey = a.horizonKey || 'quarter';
+        const domain = a.domain || (st.lifeMap.domains||[])[0];
+        if(!st.lifeMap.horizons[hKey]) st.lifeMap.horizons[hKey] = { label: a.horizon, domains:{} };
+        if(!st.lifeMap.horizons[hKey].domains[domain]) st.lifeMap.horizons[hKey].domains[domain] = [];
+        const { archivedAt, horizonKey, horizon, ...goal } = a;
+        st.lifeMap.horizons[hKey].domains[domain].unshift(goal);
+        // Restore linked threads too
+        const linkedIds = Array.isArray(goal.linkedThreadIds) ? goal.linkedThreadIds : [];
+        linkedIds.forEach(tid => {
+          const t = st.threads.find(x=>String(x.id)===String(tid));
+          if(t && t.status === 'archived') t.status = 'active';
+        });
+        archived.splice(idx, 1);
+        saveState(st); renderFooter(st); render();
+        toast('Goal and linked threads restored.');
+      });
+    });
+
+    // Permanently delete archived goal
+    root.querySelectorAll('[data-perm-delete-goal]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const id = btn.getAttribute('data-perm-delete-goal');
+        if(!confirm('Permanently delete this goal?')) return;
+        st.lifeMap.archivedGoals = (st.lifeMap.archivedGoals||[]).filter(x=>String(x.id)!==String(id));
+        saveState(st); renderFooter(st); render();
+      });
+    });
+
+    // Add goal
+    root.querySelectorAll("[data-add-goal]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const hKey   = btn.getAttribute("data-add-goal");
+        const domain = btn.getAttribute("data-d");
+        const key    = `${hKey}::${domain}`;
+        const inp    = root.querySelector(`[data-new-title="${cssEscape(key)}"]`);
+        const title  = (inp?.value||"").trim();
+        if(!title){ alert("Type a goal title first."); inp?.focus?.(); return; }
+        const now = nowIso();
+        st.lifeMap.horizons[hKey].domains[domain].unshift({
+          id: uid(), title, notes:"", urgency: st.lifeMap.defaultUrgency || "medium",
+          createdAt: now, updatedAt: now, linkedThreadIds:[]
+        });
+        inp.value="";
+        saveState(st); renderFooter(st); render();
+      });
+    });
+
+    // Promote / demote
+    root.querySelectorAll("[data-promote]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{ moveGoal(btn.getAttribute("data-promote"), btn.getAttribute("data-h"), btn.getAttribute("data-d"), "promote"); });
+    });
+    root.querySelectorAll("[data-demote]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{ moveGoal(btn.getAttribute("data-demote"), btn.getAttribute("data-h"), btn.getAttribute("data-d"), "demote"); });
+    });
+
+    // Save goal
+    root.querySelectorAll("[data-save-goal]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id     = btn.getAttribute("data-save-goal");
+        const hKey   = btn.getAttribute("data-h");
+        const domain = btn.getAttribute("data-d");
+        const g = findGoal(hKey, domain, id);
+        if(!g) return;
+        g.notes    = root.querySelector(`[data-notes="${cssEscape(id)}"]`)?.value.trim() ?? "";
+        g.urgency  = root.querySelector(`[data-urgency="${cssEscape(id)}"]`)?.value ?? "medium";
+        g.updatedAt = nowIso();
+        saveState(st); renderFooter(st); render();
+      });
+    });
+
+    // Edit goal title
+    root.querySelectorAll("[data-edit-title]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-edit-title");
+        root.querySelector(`[data-goal-title="${id}"]`).style.display = "none";
+        root.querySelector(`[data-goal-title-input="${id}"]`).style.display = "inline-block";
+        root.querySelector(`[data-edit-title="${id}"]`).style.display = "none";
+        root.querySelector(`[data-save-title="${id}"]`).style.display = "inline-block";
+        root.querySelector(`[data-cancel-title="${id}"]`).style.display = "inline-block";
+        root.querySelector(`[data-goal-title-input="${id}"]`).focus();
+      });
+    });
+
+    root.querySelectorAll("[data-save-title]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-save-title");
+        const inp = root.querySelector(`[data-goal-title-input="${id}"]`);
+        const newTitle = inp.value.trim();
+        if(!newTitle){ toast("Title can't be empty."); return; }
+        // Find and update goal in state
+        for(const hk of ["week","month","quarter"]){
+          for(const d of Object.keys(st.lifeMap.horizons[hk]?.domains||{})){
+            const g = st.lifeMap.horizons[hk].domains[d].find(x=>String(x.id)===String(id));
+            if(g){ g.title = newTitle; g.updatedAt = nowIso(); }
+          }
+        }
+        saveState(st); renderFooter(st); render();
+        toast("Goal title updated.");
+      });
+    });
+
+    root.querySelectorAll("[data-cancel-title]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id = btn.getAttribute("data-cancel-title");
+        root.querySelector(`[data-goal-title="${id}"]`).style.display = "inline";
+        root.querySelector(`[data-goal-title-input="${id}"]`).style.display = "none";
+        root.querySelector(`[data-edit-title="${id}"]`).style.display = "inline-block";
+        root.querySelector(`[data-save-title="${id}"]`).style.display = "none";
+        root.querySelector(`[data-cancel-title="${id}"]`).style.display = "none";
+      });
+    });
+
+    // Archive goal
+    root.querySelectorAll("[data-archive-goal]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id     = btn.getAttribute("data-archive-goal");
+        const hKey   = btn.getAttribute("data-h");
+        const domain = btn.getAttribute("data-d");
+        const list   = st.lifeMap.horizons[hKey]?.domains?.[domain];
+        if(!list) return;
+        const idx = list.findIndex(x=>String(x.id)===String(id));
+        if(idx<0) return;
+        const goal = list.splice(idx, 1)[0];
+        if(!st.lifeMap.archivedGoals) st.lifeMap.archivedGoals = [];
+
+        // Archive any linked threads too
+        const linkedIds = Array.isArray(goal.linkedThreadIds) ? goal.linkedThreadIds : [];
+        linkedIds.forEach(tid => {
+          const t = st.threads.find(x=>String(x.id)===String(tid));
+          if(t && t.status !== 'archived') t.status = 'archived';
+        });
+
+        st.lifeMap.archivedGoals.unshift({
+          ...goal,
+          horizonKey: hKey,
+          horizon: st.lifeMap.horizons[hKey]?.label || hKey,
+          domain,
+          archivedAt: nowIso()
+        });
+        saveState(st); renderFooter(st); render();
+        const threadCount = linkedIds.length;
+        toast(`Goal archived${threadCount ? ` (+ ${threadCount} linked thread${threadCount>1?'s':''})` : ''}.`);
+      });
+    });
+
+    // Delete goal
+    root.querySelectorAll("[data-delete-goal]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id     = btn.getAttribute("data-delete-goal");
+        const hKey   = btn.getAttribute("data-h");
+        const domain = btn.getAttribute("data-d");
+        if(!confirm("Delete this goal?")) return;
+        const list = st.lifeMap.horizons[hKey].domains[domain];
+        const idx  = list.findIndex(x=>String(x.id)===String(id));
+        if(idx>=0){ list.splice(idx,1); saveState(st); renderFooter(st); render(); }
+      });
+    });
+
+    // Create thread from goal
+    root.querySelectorAll("[data-thread-from-goal]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const id     = btn.getAttribute("data-thread-from-goal");
+        const hKey   = btn.getAttribute("data-h");
+        const domain = btn.getAttribute("data-d");
+        const g = findGoal(hKey, domain, id);
+        if(!g) return;
+        const now        = nowIso();
+        const nextAction = (g.notes||"").split("\n").map(x=>x.trim()).find(Boolean) || "First step: [describe 5–20 minute action]";
+        const thread = {
+          id: uid(), title: g.title, status: "active", domain, nextAction,
+          notes: `Linked from Life Map (${st.lifeMap.horizons[hKey].label}).\n\n${g.notes||""}`.trim(),
+          createdAt: now, updatedAt: now
+        };
+        st.threads.unshift(thread);
+        g.linkedThreadIds = Array.isArray(g.linkedThreadIds) ? g.linkedThreadIds : [];
+        g.linkedThreadIds.unshift(thread.id);
+        g.linkedThreadIds = [...new Set(g.linkedThreadIds.map(String))];
+        g.updatedAt = now;
+        saveState(st);
+        location.href = `thread-registry.html?focusThread=${encodeURIComponent(thread.id)}`;
+      });
+    });
+
+    // Open linked thread
+    root.querySelectorAll("[data-open-thread]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const tid = btn.getAttribute("data-open-thread");
+        if(tid) location.href = `thread-registry.html?focusThread=${encodeURIComponent(tid)}`;
+      });
+    });
+
+    root.querySelectorAll("[data-show-all-threads]").forEach(chk=>{
+      chk.addEventListener("change", ()=>{
+        const goalId = chk.getAttribute("data-show-all-threads");
+        attachShowAll[String(goalId)] = !!chk.checked;
+        render();
+      });
+    });
+
+    root.querySelectorAll("[data-unlink-thread]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const goalId = btn.getAttribute("data-unlink-thread");
+        const tid = btn.getAttribute("data-thread-id");
+        let g = null;
+        for(const hk of horizons){
+          for(const d of domains){
+            g = findGoal(hk, d, goalId);
+            if(g) break;
+          }
+          if(g) break;
+        }
+        if(!g) return;
+        const before = Array.isArray(g.linkedThreadIds) ? g.linkedThreadIds.map(String) : [];
+        g.linkedThreadIds = before.filter(id => String(id)!==String(tid));
+        g.updatedAt = nowIso();
+        saveState(st); renderFooter(st); render();
+        toast("Thread link removed.");
+      });
+    });
+
+    // Attach existing thread to goal
+    root.querySelectorAll("[data-attach-thread]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const goalId = btn.getAttribute("data-attach-thread");
+        const sel    = root.querySelector(`[data-attach-thread-select="${cssEscape(goalId)}"]`);
+        const tid    = sel ? sel.value : "";
+        if(!tid) return;
+        let g = null;
+        for(const hk of horizons){
+          for(const d of domains){
+            g = findGoal(hk, d, goalId);
+            if(g) break;
+          }
+          if(g) break;
+        }
+        if(!g) return;
+        g.linkedThreadIds = Array.isArray(g.linkedThreadIds) ? g.linkedThreadIds : [];
+        if(!g.linkedThreadIds.map(String).includes(String(tid))){
+          g.linkedThreadIds.unshift(tid);
+          g.linkedThreadIds = [...new Set(g.linkedThreadIds.map(String))];
+          g.updatedAt = nowIso();
+          saveState(st); renderFooter(st); render();
+        }
+      });
+    });
+
+    // Focus goal scroll (from URL param)
+    if(focusGoalId && !focusGoalDone){
+      const el = root.querySelector(`[data-goal-card="${cssEscape(focusGoalId)}"]`);
+      if(el){
+        focusGoalDone = true;
+        el.scrollIntoView({behavior:"smooth", block:"center"});
+        el.classList.add("focus-glow");
+        setTimeout(()=>el.classList.remove("focus-glow"), 1800);
+      }
+    }
+  }
+
+  render();
+}
+
+// =============================================================
+// --- Income Map ---
+// =============================================================
+function initIncomeMap(){
+  dbgMarkInit('incomeMap');
+  const st = initCommon();
+
+  const startInput    = document.querySelector("#startDate");
+  const weekEl        = document.querySelector("#weekNow");
+  const checkpointsEl = document.querySelector("#checkpoints");
+
+  if(startInput) startInput.value = st.incomeMap.startDate || "";
+
+  const cps = [
+    {week:4,  title:"Tighten focus",     detail:"Drop non-earning distractions",        threadTitle:"Income runway — Week 4: tighten focus",     nextAction:"Pick 1–2 income channels; pause one non-earning distraction."},
+    {week:6,  title:"Commit & pipeline", detail:"Commit to 1–2 channels, build pipeline",threadTitle:"Income runway — Week 6: commit & pipeline",  nextAction:"Write next 3 outreach/listing steps; schedule first one today."},
+    {week:8,  title:"Evaluate traction", detail:"Escalate if stalled",                  threadTitle:"Income runway — Week 8: evaluate traction",  nextAction:"Review wins/metrics; decide keep / adjust / stop one channel."},
+    {week:10, title:"Decision runway",   detail:"SS / part-time / pivot",               threadTitle:"Income runway — Week 10: decision runway",   nextAction:"Draft decision notes + 2 questions; book 1 call if needed."},
+  ];
+
+  function render(){
+    const w = weekNumberFromStart(st.incomeMap.startDate);
+    if(weekEl) weekEl.textContent = w ? `Week ${w} of 12` : `—`;
+
+    checkpointsEl.innerHTML = cps.map(cp=>{
+      const isNow      = w ? (w >= cp.week && w < cp.week + 2) : false;
+      const isUpcoming = w ? (w < cp.week) : true;
+      return `
+        <div class="card">
+          <h3>Week ${cp.week}: ${cp.title}</h3>
+          <div class="small">${cp.detail}</div>
+          <div class="row" style="gap:8px; align-items:center; margin-top:10px; flex-wrap:wrap">
+            <span class="pill ${isNow ? 'good' : (isUpcoming ? 'warn' : '')}" style="pointer-events:none">
+              ${isNow ? 'Current window' : (isUpcoming ? 'Upcoming' : 'Passed')}
+            </span>
+            ${w ? `<span class="pill" style="pointer-events:none">Current: Week ${w}</span>` : ""}
+            <button class="btn mini" data-mkthread="${cp.week}" title="Create a thread in the Registry">Make thread</button>
+          </div>
+          <div class="small" style="margin-top:10px"><span class="mono">Suggested micro-action:</span> ${escapeHtml(cp.nextAction)}</div>
+        </div>`;
+    }).join("");
+
+    checkpointsEl.querySelectorAll("[data-mkthread]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const wk = Number(btn.getAttribute("data-mkthread"));
+        const cp = cps.find(x=>x.week===wk);
+        if(!cp) return;
+        const now = nowIso();
+        st.threads.push({
+          id: uid(), title: cp.threadTitle, status: "active", domain: "Financial",
+          nextAction: cp.nextAction,
+          notes: `Created from Income Map checkpoint (Week ${wk}).\n\n${cp.detail}`,
+          createdAt: now, updatedAt: now,
+        });
+        saveState(st);
+        toast("Thread created in Thread Registry (domain: Income).");
+      });
+    });
+  }
+
+  if(startInput){
+    startInput.addEventListener("change", ()=>{
+      st.incomeMap.startDate = startInput.value || null;
+      saveState(st); renderFooter(st); render();
+    });
+  }
+
+  render();
+}
+
+// =============================================================
+// --- Morning Map ---
+// =============================================================
+function initMorningMap(){
+  dbgMarkInit('morningMap');
+  const container = document.getElementById('mainContent') || document.querySelectorAll('.container')[1];
+  if(!container) return;
+  initCommon();
+  const st = loadState();
+  ensureLifeMapSchema(st);
+
+  st.meta = st.meta || {};
+  if(st.meta.systemNotesText == null) st.meta.systemNotesText = '';
+  if(st.meta.northStarText == null) st.meta.northStarText = '';
+  if(!st.meta.morningScratch)    st.meta.morningScratch    = '';
+  if(!st.meta.ignitionIntent)    st.meta.ignitionIntent    = '';
+  if(!st.meta.ignitionFirstMove) st.meta.ignitionFirstMove = '';
+  if(!st.meta.ignitionTimebox)   st.meta.ignitionTimebox   = '10';
+  if(!st.meta.mvtThreadId)       st.meta.mvtThreadId       = '';
+  if(!st.meta.sparkNotes)        st.meta.sparkNotes        = '';
+
+  const threads = (st.threads || []).filter(t=>t.status!=="archived");
+  const threadOptions = ['<option value="">—</option>'].concat(
+    threads.map(t=>`<option value="${esc(String(t.id))}">${esc(t.title||'(untitled)')}</option>`)
+  ).join('');
+
+  container.innerHTML = `
+
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="h2" style="margin-bottom:6px">North Star</div>
+      <div id="nsPreview" class="nsPreview"></div>
+      <textarea id="nsText" class="nsText" spellcheck="false" placeholder="What would make life feel workable and meaningful now?">${esc(st.meta.northStarText)}</textarea>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" id="nsSave">Save</button>
+        <div class="small muted">Keep this short. Read it in 5 seconds.</div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="stack">
+        <div class="card">
+          <div class="h2">MVT: Most Valuable Task</div>
+          <div class="field">
+            <label>Today's MVT</label>
+            <select id="mvtThread">${threadOptions}</select>
+          </div>
+          <div class="row"><button class="btn primary" id="mvtSave">Save</button></div>
+        </div>
+
+        <div class="card">
+          <div class="h2">Ignition block</div>
+          <div class="field">
+            <label>Intent (one sentence)</label>
+            <input id="igIntent" type="text" placeholder="Example: Make money progress in 10 minutes." value="${esc(st.meta.ignitionIntent)}"/>
+          </div>
+          <div class="field">
+            <label>First move (physical, 60–120 seconds)</label>
+            <input id="igMove" type="text" placeholder="Example: Open Etsy drafts and add one photo." value="${esc(st.meta.ignitionFirstMove)}"/>
+          </div>
+          <div class="field">
+            <label>Timebox</label>
+            <select id="igTimebox">
+              ${['10','15','20','30'].map(v=>`<option value="${v}" ${st.meta.ignitionTimebox===v?'selected':''}>${v} min</option>`).join('')}
+            </select>
+          </div>
+          <div class="row"><button class="btn primary" id="igSave">Save</button></div>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="card">
+          <div class="h2">Focus strip</div>
+          <div class="muted">Your two active threads for the week.</div>
+          <div class="slot"><div class="small">Weekly Slot #1</div><select id="slot1">${threadOptions}</select></div>
+          <div class="slot"><div class="small">Weekly Slot #2</div><select id="slot2">${threadOptions}</select></div>
+          <div class="row"><button class="btn primary" id="slotsSave">Save</button></div>
+        </div>
+
+        <div class="card">
+          <div class="h2">Scratchpad</div>
+          <textarea id="mmScratch" class="scratch" placeholder="A quick note to future-you...">${esc(st.meta.morningScratch)}</textarea>
+          <div class="row"><button class="btn primary" id="mmScratchSave">Save</button></div>
+        </div>
+
+        <div class="card">
+          <div class="h2">Spark capture</div>
+          <textarea id="sparkNotes" class="scratch" placeholder="One per line...">${esc(st.meta.sparkNotes)}</textarea>
+          <div class="row"><button class="btn primary" id="sparkSave">Save</button></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Set dropdown values
+  const slot1El = document.getElementById('slot1');
+  const slot2El = document.getElementById('slot2');
+  const mvdEl   = document.getElementById('mvtThread');
+  if(slot1El) slot1El.value = st.weekly?.slot1 || '';
+  if(slot2El) slot2El.value = st.weekly?.slot2 || '';
+  if(mvdEl)   mvdEl.value   = st.meta.mvtThreadId   || '';
+
+  const updatePreview = ()=>{
+    const first = (document.getElementById('nsText')?.value||'').split('\n').find(l=>l.trim())||'';
+    const prev  = document.getElementById('nsPreview');
+    if(prev) prev.textContent = first.trim();
+  };
+  updatePreview();
+  document.getElementById('nsText')?.addEventListener('input', updatePreview);
+
+  document.getElementById('nsSave')?.addEventListener('click',()=>{ st.meta.northStarText = document.getElementById('nsText').value; saveState(st); toast('Saved'); updatePreview(); });
+  document.getElementById('mmScratchSave')?.addEventListener('click',()=>{ st.meta.morningScratch = document.getElementById('mmScratch').value; saveState(st); toast('Saved'); });
+  document.getElementById('sparkSave')?.addEventListener('click',()=>{ st.meta.sparkNotes = document.getElementById('sparkNotes').value; saveState(st); toast('Saved'); });
+  document.getElementById('slotsSave')?.addEventListener('click',()=>{
+    st.weekly = st.weekly || { slot1:null, slot2:null, weekOf:null };
+    st.weekly.slot1 = document.getElementById('slot1').value || null;
+    st.weekly.slot2 = document.getElementById('slot2').value || null;
+    saveState(st); toast('Saved');
+  });
+  document.getElementById('igSave')?.addEventListener('click',()=>{
+    st.meta.ignitionIntent    = document.getElementById('igIntent').value;
+    st.meta.ignitionFirstMove = document.getElementById('igMove').value;
+    st.meta.ignitionTimebox   = document.getElementById('igTimebox').value;
+    saveState(st); toast('Saved');
+  });
+  document.getElementById('mvtSave')?.addEventListener('click',()=>{ st.meta.mvtThreadId = document.getElementById('mvtThread').value; saveState(st); toast('Saved'); });
+}
+
+// =============================================================
+// --- Long View ---
+// =============================================================
+function initLongView(){
+  dbgMarkInit('longView');
+  const st = initCommon();
+  const container = document.getElementById('mainContent');
+  if(!container) return;
+
+  const legacyDomainMap = {
+    debt: 'Financial', housing: 'Home',
+    income: 'Financial', creative: 'Personal', health: 'Health',
+    tentative: 'Tentative'
+  };
+
+  function norm(v){ return String(v || '').trim().toLowerCase(); }
+  function objectiveDomain(obj){
+    if(DEFAULT_DOMAINS.includes(obj.domain)) return obj.domain;
+    // Older headings were renamed without updating their hidden category IDs.
+    // Prefer the domains of their linked work when recovering the old intent.
+    const ids = uniqueStringArray((obj.linkedThreadIdsByGoal || []).flat());
+    const primary = ids.map(id => st.threads.find(t => String(t.id) === id))
+      .find(t => t && DEFAULT_DOMAINS.includes(t.domain));
+    return primary?.domain || legacyDomainMap[obj.id] || 'Personal';
+  }
+  function ensureGoalLinks(obj){
+    if(!Array.isArray(obj.linkedThreadIdsByGoal)) obj.linkedThreadIdsByGoal = [];
+    while(obj.linkedThreadIdsByGoal.length < obj.goals.length) obj.linkedThreadIdsByGoal.push([]);
+    obj.linkedThreadIdsByGoal = obj.linkedThreadIdsByGoal.map(ids => uniqueStringArray(Array.isArray(ids) ? ids : (ids ? [ids] : [])));
+  }
+  function getGoalLinkIds(obj, idx){
+    ensureGoalLinks(obj);
+    return uniqueStringArray(obj.linkedThreadIdsByGoal[idx] || []);
+  }
+  function setGoalLinkIds(obj, idx, ids){
+    ensureGoalLinks(obj);
+    obj.linkedThreadIdsByGoal[idx] = uniqueStringArray(ids).filter(tid => st.threads.some(t => String(t.id) === String(tid)));
+  }
+  function linkedThreadsForGoal(obj, idx){
+    return getGoalLinkIds(obj, idx)
+      .map(tid => st.threads.find(t => String(t.id) === String(tid)))
+      .filter(Boolean);
+  }
+  function exactMatchThread(goalText){
+    const wanted = norm(goalText);
+    if(!wanted) return null;
+    return st.threads.find(t => norm(t.title) === wanted && t.status !== 'archived') || null;
+  }
+  function threadOptionLabel(t, goalText){
+    const exact = norm(t.title) === norm(goalText);
+    const status = t.status && t.status !== 'active' ? ` [${t.status}]` : '';
+    return `${exact ? '↺ ' : ''}${t.title || '(untitled)'}${status}${t.domain ? ` — ${t.domain}` : ''}`;
+  }
+  function threadStatusBadge(status){
+    const s = (status || 'active').toLowerCase();
+    if(s === 'archived' || s === 'done' || s === 'completed') return { label:'✓ Done', cls:'tls-done' };
+    if(s === 'paused') return { label:'⏸ Paused', cls:'tls-paused' };
+    if(s.includes('not started')) return { label:'○ Not started', cls:'tls-idle' };
+    return { label:'● Active', cls:'tls-active' };
+  }
+  function threadChipsHtml(obj, idx){
+    const threads = linkedThreadsForGoal(obj, idx);
+    if(!threads.length) return `<div class="small attach-thread-helper">No thread linked yet.</div>`;
+    const chips = threads.map(t=>{
+      const badge = threadStatusBadge(t.status);
+      return `<div class="thread-link-chip">`
+        + `<button class="thread-link-pill" type="button" data-lv-open-thread="${escapeAttr(String(t.id))}" title="Open thread: ${escapeAttr(t.title || 'Untitled thread')}">`
+        + `<span class="tlp-icon">🧵</span>`
+        + `<span class="tlp-title">${escapeHtml(t.title || 'Untitled thread')}</span>`
+        + `<span class="tlp-status ${badge.cls}">${badge.label}</span>`
+        + `</button>`
+        + `<button class="thread-unlink-btn" type="button" data-lv-unlink-thread="${escapeAttr(obj.id)}" data-idx="${idx}" data-thread-id="${escapeAttr(String(t.id))}" title="Remove linked thread: ${escapeAttr(t.title || 'Untitled thread')}" aria-label="Remove linked thread: ${escapeAttr(t.title || 'Untitled thread')}">×</button>`
+        + `</div>`;
+    }).join('');
+    return `<div class="thread-links-row">${chips}</div>`;
+  }
+  function attachBoxHtml(obj, idx, goalText){
+    const linkedIds = getGoalLinkIds(obj, idx);
+    const availableThreads = st.threads
+      .filter(t => t.status !== 'archived' && !linkedIds.includes(String(t.id)))
+      .sort((a,b)=>{
+        const aExact = norm(a.title) === norm(goalText) ? 0 : 1;
+        const bExact = norm(b.title) === norm(goalText) ? 0 : 1;
+        if(aExact !== bExact) return aExact - bExact;
+        return (a.title || '').localeCompare(b.title || '');
+      });
+    const match = exactMatchThread(goalText);
+    const matchNotLinked = match && !linkedIds.includes(String(match.id));
+    const helper = matchNotLinked
+      ? `<div class="small attach-thread-helper">An existing thread already matches this goal. You can reattach it instead of creating a duplicate.</div>`
+      : (!availableThreads.length ? `<div class="small attach-thread-helper">No other active threads available to attach.</div>` : '');
+    return `
+      <div class="attach-thread-box">
+        <label class="small">Attach existing thread</label>
+        ${helper}
+        <div class="row" style="gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px">
+          <select data-lv-attach-thread-select="${escapeAttr(obj.id)}" data-idx="${idx}" style="flex:1; min-width:220px" ${availableThreads.length ? '' : 'disabled'}>
+            <option value="">Choose thread…</option>
+            ${availableThreads.map(t => `<option value="${escapeAttr(String(t.id))}" ${matchNotLinked && String(match.id)===String(t.id) ? 'selected' : ''}>${escapeHtml(threadOptionLabel(t, goalText))}</option>`).join('')}
+          </select>
+          <button class="btn mini" type="button" data-lv-attach-thread="${escapeAttr(obj.id)}" data-idx="${idx}" ${availableThreads.length ? '' : 'disabled'}>Attach existing</button>
+        </div>
+      </div>`;
+  }
+  function syncLongViewInputsToState(targetObjId){
+    const selector = targetObjId
+      ? `.lv-goal-input[data-obj="${cssEscape(targetObjId)}"]`
+      : '.lv-goal-input';
+    container.querySelectorAll(selector).forEach(inp => {
+      const objId = inp.getAttribute('data-obj');
+      const idx = Number(inp.getAttribute('data-idx'));
+      const obj = st.longView.objectives.find(o => o.id === objId);
+      if(!obj || !Number.isFinite(idx)) return;
+      obj.goals[idx] = inp.value.trim();
+    });
+  }
+
+  function createButtonMeta(obj, idx, goalText){
+    const match = exactMatchThread(goalText);
+    const linkedIds = getGoalLinkIds(obj, idx);
+    if(match && !linkedIds.includes(String(match.id))){
+      return {
+        label: 'Reattach match',
+        title: 'Attach the existing matching thread instead of creating a new one',
+        action: 'reattach',
+        disabled: !goalText.trim(),
+        style: 'background:rgba(59,130,246,.12); color:#1d4ed8; border:1px solid rgba(59,130,246,.32);'
+      };
+    }
+    if(match && linkedIds.includes(String(match.id))){
+      return {
+        label: '✓ Linked',
+        title: 'A matching thread is already linked',
+        action: 'linked',
+        disabled: true,
+        style: 'background:rgba(16,185,129,.15); color:#059669; border:1px solid rgba(16,185,129,.4); cursor:default;'
+      };
+    }
+    return {
+      label: 'Create thread',
+      title: 'Create a new thread in the Registry and link it here',
+      action: 'create',
+      disabled: !goalText.trim(),
+      style: ''
+    };
+  }
+
+  function render(){
+    const objs = st.longView.objectives;
+    container.innerHTML = `
+      <div style="margin-bottom:18px">
+        <div class="h2" style="font-size:20px; margin-bottom:4px">🔭 Long View</div>
+        <div class="muted">Start with what matters now. Add an objective, give it a goal, then create or attach the work that moves it forward.</div>
+      </div>
+      <form id="lvAddObjective" class="card" style="margin-bottom:16px">
+        <label for="lvNewObjective">New objective</label>
+        <div class="row" style="gap:8px; flex-wrap:wrap">
+          <input id="lvNewObjective" placeholder="Name an outcome or direction…" style="flex:1; min-width:200px" required>
+          <select id="lvNewDomain" aria-label="New objective domain">
+            ${DEFAULT_DOMAINS.map(d => `<option value="${escapeAttr(d)}" ${d==='Personal'?'selected':''}>${escapeHtml(d)}</option>`).join('')}
+          </select>
+          <button class="btn primary" type="submit">Add objective</button>
+        </div>
+      </form>
+      ${objs.length ? '' : '<p class="small">Your Long View is empty. Add one objective when you are ready.</p>'}
+      ${objs.map(obj => `
+        <div class="card" style="margin-bottom:16px">
+          <div class="domain-strip ${domainClass(objectiveDomain(obj))}"></div>
+          <div class="row" style="gap:8px; align-items:center; margin-bottom:12px">
+            <div class="h2" style="font-size:17px; margin:0">🎯 <span data-lv-label="${escapeAttr(obj.id)}">${escapeHtml(obj.label)}</span></div>
+            <button class="btn mini" type="button" data-lv-edit-label="${escapeAttr(obj.id)}">Edit objective</button>
+          </div>
+          <div class="field" style="margin-bottom:14px">
+            <label for="lv-domain-${escapeAttr(obj.id)}">Domain for new threads</label>
+            <select id="lv-domain-${escapeAttr(obj.id)}" data-lv-domain="${escapeAttr(obj.id)}">
+              ${DEFAULT_DOMAINS.map(d => `<option value="${escapeAttr(d)}" ${d===objectiveDomain(obj)?'selected':''}>${escapeHtml(d)}</option>`).join('')}
+            </select>
+            <div class="small">Existing linked threads keep their own domains.</div>
+          </div>
+          ${obj.goals.map((g, i) => {
+            const btnMeta = createButtonMeta(obj, i, g || '');
+            return `
+            <div class="field" style="margin-bottom:14px">
+              <div class="row" style="gap:8px; align-items:center; flex-wrap:wrap">
+                <input
+                  type="text"
+                  class="lv-goal-input"
+                  data-obj="${obj.id}"
+                  data-idx="${i}"
+                  aria-label="Goal ${i+1} for ${escapeAttr(obj.label)}"
+                  placeholder="Goal ${i+1} — what does progress look like in 12 weeks?"
+                  value="${escapeHtml(g)}"
+                  style="flex:1"
+                />
+                <button
+                  class="btn mini lv-create-or-reattach"
+                  data-obj="${obj.id}"
+                  data-idx="${i}"
+                  data-action="${btnMeta.action}"
+                  title="${escapeAttr(btnMeta.title)}"
+                  ${btnMeta.disabled ? 'disabled' : ''}
+                  style="${btnMeta.style}"
+                >${btnMeta.label}</button>
+                <button class="btn mini" type="button" data-lv-remove-goal="${escapeAttr(obj.id)}" data-idx="${i}">Remove goal</button>
+              </div>
+              ${threadChipsHtml(obj, i)}
+              ${attachBoxHtml(obj, i, g || '')}
+            </div>
+          `}).join('')}
+          <div class="row" style="margin-top:6px">
+            <button class="btn lv-save" data-obj="${obj.id}">Save goals</button>
+            <button class="btn mini" type="button" data-lv-add-goal="${escapeAttr(obj.id)}">Add goal slot</button>
+            <button class="btn mini" type="button" data-lv-remove-objective="${escapeAttr(obj.id)}">Remove objective</button>
+          </div>
+        </div>
+      `).join('')}
+    `;
+
+    container.querySelector('#lvAddObjective').addEventListener('submit', e => {
+      e.preventDefault();
+      const label = container.querySelector('#lvNewObjective').value.trim();
+      if(!label) return;
+      syncLongViewInputsToState();
+      const obj = {
+        id: uid(), label, domain: container.querySelector('#lvNewDomain').value,
+        goals: [''], linkedThreadIdsByGoal: [[]]
+      };
+      st.longView.objectives.push(obj);
+      saveState(st);
+      render();
+      container.querySelector(`.lv-goal-input[data-obj="${cssEscape(obj.id)}"]`)?.focus();
+    });
+
+    container.querySelectorAll('[data-lv-domain]').forEach(select => {
+      select.addEventListener('change', () => {
+        syncLongViewInputsToState();
+        const obj = st.longView.objectives.find(o => o.id === select.getAttribute('data-lv-domain'));
+        if(!obj) return;
+        obj.domain = select.value;
+        saveState(st);
+        render();
+      });
+    });
+
+    container.querySelectorAll('.lv-goal-input').forEach(input => {
+      input.addEventListener('input', () => {
+        const obj = st.longView.objectives.find(o => o.id === input.getAttribute('data-obj'));
+        const idx = Number(input.getAttribute('data-idx'));
+        if(!obj) return;
+        const meta = createButtonMeta(obj, idx, input.value);
+        const btn = container.querySelector(`.lv-create-or-reattach[data-obj="${cssEscape(obj.id)}"][data-idx="${idx}"]`);
+        btn.disabled = meta.disabled;
+        btn.textContent = meta.label;
+        btn.title = meta.title;
+        btn.style.cssText = meta.style;
+      });
+    });
+
+    container.querySelectorAll('[data-lv-remove-goal]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const obj = st.longView.objectives.find(o => o.id === btn.getAttribute('data-lv-remove-goal'));
+        const idx = Number(btn.getAttribute('data-idx'));
+        if(!obj) return;
+        if(!confirm('Remove this Long View goal? Linked threads will stay in the Registry.')) return;
+        syncLongViewInputsToState();
+        obj.goals.splice(idx, 1);
+        obj.linkedThreadIdsByGoal.splice(idx, 1);
+        saveState(st);
+        render();
+      });
+    });
+
+    container.querySelectorAll('[data-lv-remove-objective]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if(!confirm('Remove this objective and its Long View goals? Linked threads will stay in the Registry.')) return;
+        syncLongViewInputsToState();
+        const id = btn.getAttribute('data-lv-remove-objective');
+        st.longView.objectives = st.longView.objectives.filter(o => o.id !== id);
+        saveState(st);
+        render();
+      });
+    });
+
+    // Objective headings are editable independently of their goal slots.
+    container.querySelectorAll('[data-lv-edit-label]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const obj = st.longView.objectives.find(o => o.id === btn.getAttribute('data-lv-edit-label'));
+        if(!obj) return;
+        if(btn._finishEdit){ btn._finishEdit(); return; }
+        const label = container.querySelector(`[data-lv-label="${cssEscape(obj.id)}"]`);
+        const input = document.createElement('input');
+        input.value = obj.label;
+        input.setAttribute('aria-label', 'Objective name');
+        input.style.minWidth = '240px';
+        label.replaceWith(input);
+        btn.textContent = 'Save objective';
+        const finish = () => {
+          const next = input.value.trim();
+          if(!next){ toast('Objective name cannot be empty.'); input.focus(); return; }
+          syncLongViewInputsToState();
+          obj.label = next;
+          saveState(st);
+          toast('Objective updated on this device. Push to sync.');
+          render();
+        };
+        btn._finishEdit = finish;
+        input.addEventListener('keydown', e => {
+          if(e.key === 'Enter') finish();
+          if(e.key === 'Escape') render();
+        });
+        input.focus();
+        input.select();
+      });
+    });
+
+    container.querySelectorAll('[data-lv-add-goal]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        syncLongViewInputsToState();
+        const obj = st.longView.objectives.find(o => o.id === btn.getAttribute('data-lv-add-goal'));
+        if(!obj) return;
+        obj.goals.push('');
+        ensureGoalLinks(obj);
+        saveState(st);
+        render();
+        const inputs = container.querySelectorAll(`.lv-goal-input[data-obj="${cssEscape(obj.id)}"]`);
+        inputs[inputs.length-1]?.focus();
+      });
+    });
+
+    // Save buttons
+    container.querySelectorAll('.lv-save').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const objId = btn.getAttribute('data-obj');
+        const obj   = st.longView.objectives.find(o => o.id === objId);
+        if(!obj) return;
+        syncLongViewInputsToState();
+        saveState(st);
+        toast('Goals saved on this device. Push to sync.');
+        render();
+      });
+    });
+
+    container.querySelectorAll('[data-lv-open-thread]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tid = btn.getAttribute('data-lv-open-thread');
+        if(tid) location.href = `thread-registry.html?focusThread=${encodeURIComponent(tid)}`;
+      });
+    });
+
+    container.querySelectorAll('[data-lv-unlink-thread]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const objId = btn.getAttribute('data-lv-unlink-thread');
+        const idx = Number(btn.getAttribute('data-idx'));
+        const tid = btn.getAttribute('data-thread-id');
+        const obj = st.longView.objectives.find(o => o.id === objId);
+        if(!obj) return;
+        syncLongViewInputsToState();
+        setGoalLinkIds(obj, idx, getGoalLinkIds(obj, idx).filter(id => String(id) !== String(tid)));
+        saveState(st);
+        toast('Thread detached from Long View goal.');
+        render();
+      });
+    });
+
+    container.querySelectorAll('[data-lv-attach-thread]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const objId = btn.getAttribute('data-lv-attach-thread');
+        const idx = Number(btn.getAttribute('data-idx'));
+        syncLongViewInputsToState();
+        const obj = st.longView.objectives.find(o => o.id === objId);
+        if(!obj) return;
+        const sel = container.querySelector(`[data-lv-attach-thread-select="${cssEscape(objId)}"][data-idx="${idx}"]`);
+        const tid = sel?.value;
+        if(!tid) { toast('Choose a thread first.'); return; }
+        setGoalLinkIds(obj, idx, getGoalLinkIds(obj, idx).concat([tid]));
+        saveState(st);
+        toast('Existing thread attached.');
+        render();
+      });
+    });
+
+    container.querySelectorAll('.lv-create-or-reattach').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if(btn.disabled) return;
+        const objId = btn.getAttribute('data-obj');
+        const idx   = Number(btn.getAttribute('data-idx'));
+        syncLongViewInputsToState();
+        const obj   = st.longView.objectives.find(o => o.id === objId);
+        if(!obj) return;
+        const goalText = String(obj.goals[idx] || '').trim();
+        if(!goalText) return;
+        const match = exactMatchThread(goalText);
+        const linkedIds = getGoalLinkIds(obj, idx);
+        if(match && !linkedIds.includes(String(match.id))){
+          setGoalLinkIds(obj, idx, linkedIds.concat([match.id]));
+          saveState(st);
+          toast('Existing matching thread reattached.');
+          render();
+          return;
+        }
+        if(match && linkedIds.includes(String(match.id))){
+          toast('That matching thread is already linked here.');
+          return;
+        }
+        const now = nowIso();
+        const thread = {
+          id: uid(),
+          title: goalText,
+          status: 'active',
+          domain: objectiveDomain(obj),
+          nextAction: '',
+          notes: `Created from Long View objective: ${obj.label}`,
+          createdAt: now,
+          updatedAt: now,
+        };
+        st.threads.push(thread);
+        setGoalLinkIds(obj, idx, linkedIds.concat([thread.id]));
+        saveState(st);
+        toast('Thread created in Thread Registry and linked here.');
+        render();
+      });
+    });
+  }
+
+  render();
+}
+
+// =============================================================
+// --- Overview (simple read-only) ---
+// =============================================================
+function initOverview(){
+  dbgMarkInit('overview');
+  const st = initCommon();
+  const notesEl = document.getElementById('notesText');
+  if(notesEl){
+    notesEl.value = st.meta.systemNotesText || '';
+    document.getElementById('notesSave')?.addEventListener('click',()=>{
+      st.meta.systemNotesText = notesEl.value;
+      saveState(st);
+      toast('Saved');
+    });
+  }
+}
+
+// =============================================================
+// --- Page router ---
+// =============================================================
+document.addEventListener("DOMContentLoaded", ()=>{
+  dbgRefresh();
+  ensureTopbarNav();
+  const page = (document.body.getAttribute("data-page")||"").toLowerCase();
+  if     (page==="quick")                      { dbgMarkInit('quick');      initQuickCapture();  }
+  else if(page==="registry")                   { dbgMarkInit('registry');   initThreadRegistry();}
+  else if(page==="morningmap" || page==="home"){ dbgMarkInit('morningMap'); initMorningMap();    }
+  else if(page==="lifemap")                    { dbgMarkInit('lifeMap');    initLifeMap();       }
+  else if(page==="income")                     { dbgMarkInit('income');     initIncomeMap();     }
+  else if(page==="longview")                   { dbgMarkInit('longview');   initLongView();      }
+  else if(page==="overview")                   { dbgMarkInit('overview');   initOverview();      }
+  else                                         { dbgMarkInit('common');     initCommon();        }
+});
+
+document.addEventListener("DOMContentLoaded", ()=>{
+  try{ const el = document.querySelector("[data-build]"); if(el) el.textContent = BUILD_VERSION; }catch(e){}
+});
